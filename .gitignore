@@ -1,0 +1,5 @@
+# Ne jamais versionner le .env — il contient des secrets
+.env
+
+# Artefacts Docker
+*.tar

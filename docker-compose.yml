@@ -1,0 +1,214 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Autoflow Community — Docker Compose
+#
+# Stack : AWX 24.x + PostgreSQL 15 + Redis 7
+# Accès : http://localhost:${AWX_HTTP_PORT:-8080}
+#
+# Prérequis :
+#   - Docker Engine 24+ et Docker Compose v2
+#   - Avoir rempli le fichier .env (cp .env .env et éditer les valeurs)
+#   - Le groupe docker doit exister : getent group docker
+#
+# Démarrage :
+#   docker compose up -d
+#   docker compose logs -f awx_web   # suivre l'init (≈ 3-5 min au premier boot)
+# ──────────────────────────────────────────────────────────────────────────────
+
+networks:
+  awx:
+    driver: bridge
+    name: autoflow_community_net
+
+volumes:
+  postgres_data:
+    name: autoflow_community_postgres
+  redis_data:
+    name: autoflow_community_redis
+  awx_projects:
+    name: autoflow_community_projects
+  receptor_run:
+    name: autoflow_community_receptor_run
+
+# ── Shared environment ────────────────────────────────────────────────────────
+x-awx-env: &awx-env
+  POSTGRES_DB:        ${POSTGRES_DB:-awx}
+  POSTGRES_USER:      ${POSTGRES_USER:-awx}
+  POSTGRES_PASSWORD:  ${POSTGRES_PASSWORD}
+  DATABASE_HOST:      postgres
+  DATABASE_PORT:      "5432"
+  REDIS_HOST:         redis
+  REDIS_PORT:         "6379"
+  REDIS_PASSWORD:     ${REDIS_PASSWORD}
+  AWX_ADMIN_USER:     ${AWX_ADMIN_USER:-admin}
+  AWX_ADMIN_PASSWORD: ${AWX_ADMIN_PASSWORD}
+  AWX_ADMIN_EMAIL:    ${AWX_ADMIN_EMAIL:-admin@example.com}
+  AWX_SECRET_KEY:     ${AWX_SECRET_KEY}
+
+x-log: &log-default
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:15.17-alpine
+    container_name: awx_community_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB:-awx}
+      POSTGRES_USER:     ${POSTGRES_USER:-awx}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - awx
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-awx} -d ${POSTGRES_DB:-awx}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    security_opt: [no-new-privileges:true]
+    <<: *log-default
+
+  # ── Redis ───────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7.4.8-alpine
+    container_name: awx_community_redis
+    restart: unless-stopped
+    entrypoint: ["/entrypoint.sh"]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+      - ./config/redis/redis.conf:/etc/redis/redis.conf:ro
+      - ./config/redis/entrypoint.sh:/entrypoint.sh:ro
+    networks:
+      - awx
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$REDIS_PASSWORD\" --no-auth-warning ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    security_opt: [no-new-privileges:true]
+    <<: *log-default
+
+  # ── Receptor — moteur d'exécution des jobs Ansible ─────────────────────────
+  receptor:
+    build:
+      context: ./config/receptor
+      dockerfile: Dockerfile
+    image: autoflow/receptor-community:local
+    container_name: awx_community_receptor
+    restart: unless-stopped
+    hostname: awx
+    user: root
+    command: receptor --config /etc/receptor/receptor.conf
+    volumes:
+      - ./config/receptor/receptor.conf:/etc/receptor/receptor.conf:ro
+      - receptor_run:/var/run/receptor
+      - awx_projects:/var/lib/awx/projects
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp:/tmp
+    group_add:
+      - "${DOCKER_GID:-998}"
+    networks:
+      - awx
+    healthcheck:
+      test: ["CMD-SHELL", "receptorctl --socket /var/run/receptor/receptor.sock status || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    security_opt: [no-new-privileges:true]
+    <<: *log-default
+
+  # ── AWX Migrate — initialisation de la base (one-shot) ─────────────────────
+  awx_migrate:
+    image: ghcr.io/autoflow-io/awx:${AWX_VERSION:-24.6.1}
+    container_name: awx_community_migrate
+    restart: "no"
+    user: root
+    entrypoint: ["/bin/bash", "/etc/awx-init/init.sh"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      <<: *awx-env
+    volumes:
+      - ./config/awx/settings.py:/etc/tower/settings.py:ro
+      - ./config/awx/init.sh:/etc/awx-init/init.sh:ro
+    networks:
+      - awx
+    <<: *log-default
+
+  # ── AWX Web — interface utilisateur ────────────────────────────────────────
+  awx_web:
+    image: ghcr.io/autoflow-io/awx:${AWX_VERSION:-24.6.1}
+    container_name: awx_community_web
+    restart: unless-stopped
+    hostname: awxweb
+    user: root
+    command: /usr/bin/launch_awx_web.sh
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      awx_migrate:
+        condition: service_completed_successfully
+    environment:
+      <<: *awx-env
+    ports:
+      - "${AWX_HTTP_PORT:-8080}:80"
+    volumes:
+      - ./config/awx/settings.py:/etc/tower/settings.py:ro
+      - ./config/awx/nginx.conf:/etc/nginx/default.d/awx.conf:ro
+      - awx_projects:/var/lib/awx/projects
+      - receptor_run:/var/run/receptor
+    networks:
+      - awx
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost/api/v2/ping/ || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    security_opt: [no-new-privileges:true]
+    <<: *log-default
+
+  # ── AWX Task — exécution des playbooks Ansible ─────────────────────────────
+  awx_task:
+    image: ghcr.io/autoflow-io/awx:${AWX_VERSION:-24.6.1}
+    container_name: awx_community_task
+    restart: unless-stopped
+    hostname: awx
+    user: root
+    command: /usr/bin/launch_awx_task_autoflow.sh
+    depends_on:
+      awx_web:
+        condition: service_healthy
+      receptor:
+        condition: service_healthy
+    environment:
+      <<: *awx-env
+      AWX_TASK_HOSTNAME: awx
+    volumes:
+      - ./config/awx/settings.py:/etc/tower/settings.py:ro
+      - awx_projects:/var/lib/awx/projects
+      - receptor_run:/var/run/receptor
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp:/tmp
+    group_add:
+      - "${DOCKER_GID:-998}"
+    networks:
+      - awx
+    security_opt: [no-new-privileges:true]
+    <<: *log-default
