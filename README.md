@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/your-org/autoflow-community/main/docs/logo.png" alt="Autoflow" width="80" />
+<img src="https://raw.githubusercontent.com/getautoflow/autoflow/main/docs/logo.png" alt="Autoflow" width="80" />
 
 # Autoflow Community
 
@@ -9,10 +9,10 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![AWX](https://img.shields.io/badge/AWX-24.6.1-red.svg)](https://github.com/ansible/awx)
 [![Docker](https://img.shields.io/badge/Docker-24%2B-blue.svg)](https://docs.docker.com/engine/install/)
-[![GitHub Stars](https://img.shields.io/github/stars/your-org/autoflow-community?style=flat)](https://github.com/your-org/autoflow-community/stargazers)
-[![GitHub Issues](https://img.shields.io/github/issues/your-org/autoflow-community)](https://github.com/your-org/autoflow-community/issues)
+[![GitHub Stars](https://img.shields.io/github/stars/getautoflow/autoflow?style=flat)](https://github.com/getautoflow/autoflow/stargazers)
+[![GitHub Issues](https://img.shields.io/github/issues/getautoflow/autoflow)](https://github.com/getautoflow/autoflow/issues)
 
-[Site officiel](https://autoflow.io) · [Documentation](https://autoflow.io/docs) · [Version Enterprise](https://autoflow.io/pricing) · [Signaler un bug](https://github.com/your-org/autoflow-community/issues)
+[Site officiel](https://getautoflow.dev) · [Documentation](https://getautoflow.dev/docs) · [Version Enterprise](https://getautoflow.dev/pricing) · [Signaler un bug](https://github.com/getautoflow/autoflow/issues)
 
 </div>
 
@@ -45,23 +45,106 @@ $ docker compose up -d
 | Execution Environments inclus | ✅ | ❌ | ✅ |
 | Sans comptage de nœuds | ✅ | ✅ | ❌ (licence par nœud) |
 | Gratuit pour toujours | ✅ | ✅ | ❌ (~14 000 €/an) |
-| PKI, Gitea, Grafana intégrés | ❌ ([Enterprise](https://autoflow.io/pricing)) | ❌ | Partiel |
-| Support commercial | ❌ ([Enterprise](https://autoflow.io/pricing)) | ❌ | ✅ |
+| PKI, Gitea, Grafana intégrés | ❌ ([Enterprise](https://getautoflow.dev/pricing)) | ❌ | Partiel |
+| Support commercial | ❌ ([Enterprise](https://getautoflow.dev/pricing)) | ❌ | ✅ |
 
 ---
 
 ## Prérequis
 
-| Composant | Version minimale |
-|---|---|
-| Docker Engine | 24.0+ |
-| Docker Compose | v2.20+ |
-| OS | Linux x86_64 (Ubuntu 22.04+, Debian 12+, RHEL 8+) |
-| RAM | 4 Go minimum, **8 Go recommandés** |
-| CPU | 2 vCPU minimum, 4 recommandés |
-| Disque | 20 Go libres |
+### Matériel
 
-> **Note :** Windows et macOS sont supportés via Docker Desktop, mais non recommandés pour un usage production.
+| Ressource | Minimum | Recommandé (prod) |
+|---|---|---|
+| RAM | 4 Go | 8 Go |
+| CPU | 2 vCPU | 4 vCPU |
+| Disque | 20 Go | 60 Go+ (images EE : 1–3 Go chacune) |
+
+### Système d'exploitation
+
+Linux x86_64 — **Ubuntu 22.04 LTS / Debian 12 / RHEL 8+ / Rocky Linux 8+** sont testés.
+
+> Windows et macOS sont supportés via Docker Desktop mais **non recommandés en production**.
+
+### Logiciels requis
+
+Tous ces outils doivent être installés sur la machine hôte avant de commencer.
+
+#### Docker Engine 24+
+
+```bash
+# Ubuntu / Debian
+curl -fsSL https://get.docker.com | sh
+
+# Vérifier
+docker --version        # Docker version 24.x.x ou supérieur
+docker compose version  # Docker Compose version v2.20.x ou supérieur
+```
+
+> **Important :** Autoflow Community utilise **Docker Compose V2** (plugin intégré à Docker, commande `docker compose`).
+> La version autonome `docker-compose` (V1) n'est pas supportée.
+
+#### Ajouter votre utilisateur au groupe docker
+
+```bash
+sudo usermod -aG docker $USER
+newgrp docker          # appliquer sans se déconnecter
+
+# Vérifier
+docker ps              # doit fonctionner sans sudo
+```
+
+#### Autres utilitaires système
+
+Ces outils sont présents sur toute distribution Linux standard :
+
+```bash
+# Vérifier leur présence
+git --version          # ≥ 2.x  — pour cloner le dépôt
+curl --version         # ≥ 7.x  — pour les health checks
+openssl version        # ≥ 1.1  — pour générer AWX_SECRET_KEY
+getent group docker    # outil coreutils — pour obtenir le GID Docker
+```
+
+Si l'un d'eux manque :
+
+```bash
+# Ubuntu / Debian
+sudo apt-get install -y git curl openssl
+
+# RHEL / Rocky / AlmaLinux
+sudo dnf install -y git curl openssl
+```
+
+#### Python 3 et venv (optionnel — uniquement pour ansible-builder)
+
+**Python n'est pas nécessaire pour faire tourner la stack AWX.** Tout s'exécute dans des conteneurs Docker.
+
+Python est utile uniquement si vous souhaitez :
+- Construire des **Execution Environments** personnalisés avec `ansible-builder`
+- Utiliser le client CLI `awxkit` pour scripter l'API AWX
+
+```bash
+# Vérifier
+python3 --version      # ≥ 3.9 recommandé
+
+# Ubuntu / Debian
+sudo apt-get install -y python3 python3-venv python3-pip
+
+# RHEL / Rocky / AlmaLinux
+sudo dnf install -y python3 python3-pip
+```
+
+Créez un environnement virtuel dédié pour isoler les outils Ansible :
+
+```bash
+python3 -m venv ~/ansible-tools
+source ~/ansible-tools/bin/activate
+pip install ansible-builder awxkit
+```
+
+> **Pourquoi un venv ?** Pour éviter les conflits entre versions de packages Python sur votre système.
+> Réactivez l'environnement à chaque session : `source ~/ansible-tools/bin/activate`
 
 ---
 
@@ -70,14 +153,15 @@ $ docker compose up -d
 ### 1. Cloner le dépôt
 
 ```bash
-git clone https://github.com/your-org/autoflow-community.git
-cd autoflow-community
+git clone https://github.com/getautoflow/autoflow.git
+cd autoflow
 ```
 
 ### 2. Configurer l'environnement
 
 ```bash
 cp .env.example .env
+chmod 600 .env        # protéger le fichier (contient des secrets)
 ```
 
 Ouvrez `.env` et remplissez **au minimum** ces quatre valeurs :
@@ -86,18 +170,25 @@ Ouvrez `.env` et remplissez **au minimum** ces quatre valeurs :
 POSTGRES_PASSWORD=un_mot_de_passe_fort
 REDIS_PASSWORD=un_autre_mot_de_passe
 AWX_ADMIN_PASSWORD=votre_mot_de_passe_admin
-AWX_SECRET_KEY=$(openssl rand -hex 32)
+AWX_SECRET_KEY=     # voir ci-dessous
 ```
 
-> **Important :** Ne réutilisez jamais `AWX_SECRET_KEY` entre environnements. Générez une valeur unique avec `openssl rand -hex 32`.
-
-### 3. Récupérer le GID Docker
-
-Receptor a besoin d'accéder au socket Docker pour lancer les jobs Ansible :
+Générez la clé secrète Django :
 
 ```bash
-# Ajoutez la valeur retournée dans votre .env → DOCKER_GID=...
+openssl rand -hex 32
+# copiez la sortie dans AWX_SECRET_KEY=...
+```
+
+> **Important :** Ne réutilisez jamais `AWX_SECRET_KEY` entre environnements. Cette clé chiffre les credentials stockés dans AWX.
+
+### 3. Récupérer le GID du groupe Docker
+
+Receptor a besoin d'accéder au socket Docker pour lancer les conteneurs EE :
+
+```bash
 getent group docker | cut -d: -f3
+# exemple : 998  →  ajoutez DOCKER_GID=998 dans .env
 ```
 
 ### 4. Construire et démarrer
@@ -109,8 +200,8 @@ docker compose up -d
 La première fois, Docker construit l'image Receptor et initialise la base de données AWX (~3–5 minutes). Suivez la progression :
 
 ```bash
-docker compose logs -f awx_migrate   # initialisation (migrations + admin)
-docker compose logs -f awx_web       # démarrage de l'interface
+docker compose logs -f awx_migrate   # étape 1 : migrations + création admin
+docker compose logs -f awx_web       # étape 2 : démarrage interface
 ```
 
 ### 5. Accéder à AWX
@@ -121,6 +212,11 @@ Une fois `awx_web` en état `healthy` :
 http://localhost:8080
 Identifiant : valeur de AWX_ADMIN_USER  (défaut : admin)
 Mot de passe : valeur de AWX_ADMIN_PASSWORD
+```
+
+```bash
+# Vérifier que tous les services sont sains
+docker compose ps
 ```
 
 ---
@@ -137,9 +233,190 @@ Mot de passe : valeur de AWX_ADMIN_PASSWORD
 | `AWX_ADMIN_USER` | Login du compte administrateur AWX | `admin` |
 | `AWX_ADMIN_PASSWORD` | Mot de passe du compte administrateur | **obligatoire** |
 | `AWX_ADMIN_EMAIL` | Email du compte administrateur | `admin@example.com` |
-| `AWX_SECRET_KEY` | Clé secrète Django (générer avec `openssl rand -hex 32`) | **obligatoire** |
+| `AWX_SECRET_KEY` | Clé secrète Django — générer avec `openssl rand -hex 32` | **obligatoire** |
 | `AWX_HTTP_PORT` | Port HTTP exposé sur l'hôte | `8080` |
 | `DOCKER_GID` | GID du groupe `docker` sur l'hôte | `998` |
+
+---
+
+## Tuning système (production)
+
+Ces réglages sont **requis en production** pour éviter des avertissements Redis et des problèmes de performance.
+
+### Redis — overcommit mémoire
+
+```bash
+# Appliquer immédiatement
+sudo sysctl -w vm.overcommit_memory=1
+sudo sysctl -w net.core.somaxconn=1024
+
+# Rendre persistant après reboot
+echo 'vm.overcommit_memory = 1' | sudo tee -a /etc/sysctl.d/99-autoflow.conf
+echo 'net.core.somaxconn = 1024' | sudo tee -a /etc/sysctl.d/99-autoflow.conf
+sudo sysctl --system
+```
+
+### Désactiver Transparent Huge Pages (THP)
+
+THP dégrade les performances de Redis et PostgreSQL :
+
+```bash
+# Appliquer immédiatement
+echo never | sudo tee /sys/kernel/mm/transparent_hugepage/enabled
+echo never | sudo tee /sys/kernel/mm/transparent_hugepage/defrag
+
+# Rendre persistant (systemd)
+sudo tee /etc/systemd/system/disable-thp.service > /dev/null <<'EOF'
+[Unit]
+Description=Disable Transparent Huge Pages
+DefaultDependencies=no
+After=sysinit.target local-fs.target
+Before=basic.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'echo never > /sys/kernel/mm/transparent_hugepage/enabled'
+ExecStart=/bin/sh -c 'echo never > /sys/kernel/mm/transparent_hugepage/defrag'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=basic.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now disable-thp.service
+```
+
+### Limites de fichiers ouvertes
+
+```bash
+# Vérifier la limite actuelle
+ulimit -n
+
+# Si < 65536, augmenter dans /etc/security/limits.conf :
+echo '* soft nofile 65536' | sudo tee -a /etc/security/limits.conf
+echo '* hard nofile 65536' | sudo tee -a /etc/security/limits.conf
+```
+
+---
+
+## Reverse proxy HTTPS (production)
+
+En production, **n'exposez jamais AWX directement sur le port 8080 sans TLS**. Placez un reverse proxy devant.
+
+### Option A — nginx + Let's Encrypt (Certbot)
+
+```bash
+sudo apt-get install -y nginx certbot python3-certbot-nginx
+
+# Obtenir un certificat
+sudo certbot --nginx -d awx.votre-domaine.com
+```
+
+Ajoutez ce bloc dans `/etc/nginx/sites-available/awx` :
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name awx.votre-domaine.com;
+
+    ssl_certificate     /etc/letsencrypt/live/awx.votre-domaine.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/awx.votre-domaine.com/privkey.pem;
+
+    # En-têtes de sécurité
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    add_header X-Frame-Options SAMEORIGIN;
+    add_header X-Content-Type-Options nosniff;
+
+    location / {
+        proxy_pass         http://127.0.0.1:8080;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+
+        # WebSocket (live output des jobs)
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade    $http_upgrade;
+        proxy_set_header   Connection "upgrade";
+        proxy_read_timeout 86400s;
+    }
+}
+
+server {
+    listen 80;
+    server_name awx.votre-domaine.com;
+    return 301 https://$host$request_uri;
+}
+```
+
+```bash
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+### Option B — Caddy (certificat automatique)
+
+```bash
+sudo apt-get install -y debian-keyring debian-archive-keyring apt-transport-https
+curl -1sLf https://dl.cloudsmith.io/public/caddy/stable/gpg.key | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/caddy-stable-archive-keyring.gpg] https://dl.cloudsmith.io/public/caddy/stable/deb/debian any-version main" | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+sudo apt-get update && sudo apt-get install -y caddy
+```
+
+`/etc/caddy/Caddyfile` :
+
+```caddyfile
+awx.votre-domaine.com {
+    reverse_proxy localhost:8080 {
+        header_up X-Forwarded-Proto {scheme}
+    }
+}
+```
+
+```bash
+sudo systemctl reload caddy
+```
+
+> **Note :** Après avoir configuré le reverse proxy, changez `AWX_HTTP_PORT` pour qu'AWX ne soit plus accessible directement depuis l'extérieur (par exemple `AWX_HTTP_PORT=127.0.0.1:8080` pour le lier à localhost uniquement).
+
+---
+
+## Pare-feu
+
+Autorisez uniquement les ports nécessaires :
+
+```bash
+# UFW (Ubuntu/Debian)
+sudo ufw allow 22/tcp    # SSH
+sudo ufw allow 80/tcp    # HTTP (redirection vers HTTPS)
+sudo ufw allow 443/tcp   # HTTPS
+sudo ufw deny 8080/tcp   # bloquer l'accès direct AWX depuis l'extérieur
+sudo ufw enable
+
+# firewalld (RHEL/Rocky)
+sudo firewall-cmd --permanent --add-service=ssh
+sudo firewall-cmd --permanent --add-service=http
+sudo firewall-cmd --permanent --add-service=https
+sudo firewall-cmd --permanent --remove-port=8080/tcp
+sudo firewall-cmd --reload
+```
+
+---
+
+## Sécurité — checklist
+
+- [ ] `.env` protégé en lecture seule : `chmod 600 .env`
+- [ ] Mots de passe forts (≥ 20 caractères) pour `POSTGRES_PASSWORD`, `REDIS_PASSWORD`, `AWX_ADMIN_PASSWORD`
+- [ ] `AWX_SECRET_KEY` générée avec `openssl rand -hex 32`, unique par environnement
+- [ ] AWX derrière un reverse proxy TLS (nginx ou Caddy)
+- [ ] Port 8080 fermé depuis l'extérieur (firewall)
+- [ ] SSH avec clé uniquement (`PasswordAuthentication no`)
+- [ ] Mises à jour système régulières (`apt upgrade` / `dnf update`)
+- [ ] Sauvegardes testées et stockées hors du serveur
+
+> **Docker socket :** Receptor monte `/var/run/docker.sock` pour lancer les conteneurs EE.
+> Tout processus avec accès à ce socket a les droits root effectif sur l'hôte.
+> Assurez-vous que seuls les conteneurs de cette stack y accèdent.
 
 ---
 
@@ -173,9 +450,9 @@ L'image Autoflow inclut un EE de base pré-enregistré dans AWX :
 
 Vous le trouverez dans AWX sous **Administration → Execution Environments**.
 
-### Utiliser un EE custom
+### Utiliser un EE externe
 
-Pour ajouter un EE externe (depuis Docker Hub, GHCR ou votre registry privé) :
+Pour ajouter un EE depuis Docker Hub, GHCR ou votre registry privé :
 
 1. Dans AWX : **Administration → Execution Environments → Add**
 2. Renseignez le champ **Image** avec le nom complet de l'image
@@ -183,10 +460,14 @@ Pour ajouter un EE externe (depuis Docker Hub, GHCR ou votre registry privé) :
 
 ### Construire votre propre EE
 
-Installez [`ansible-builder`](https://ansible-builder.readthedocs.io/) et créez un fichier `execution-environment.yml` :
+Requis : Python 3.9+, venv, Docker — voir la section [Prérequis](#prérequis).
 
-```yaml
-# execution-environment.yml
+```bash
+# Activer l'environnement Python
+source ~/ansible-tools/bin/activate
+
+# Créer le fichier de définition
+cat > execution-environment.yml <<'EOF'
 version: 3
 
 build_arg_defaults:
@@ -198,27 +479,21 @@ dependencies:
       - name: community.general
         version: ">=9.0"
       - name: ansible.posix
-      - name: cisco.ios          # Pour l'automatisation réseau Cisco
-      - name: community.crypto   # Pour la gestion PKI/TLS
+      - name: cisco.ios          # Automatisation réseau Cisco
+      - name: community.crypto   # Gestion PKI / TLS
 
   python:
-    - boto3                      # Pour les modules AWS
-    - netmiko                    # Pour les équipements réseau
-```
-
-Construisez et poussez l'image :
-
-```bash
-# Installer ansible-builder
-pip install ansible-builder
+    - boto3                      # Modules AWS
+    - netmiko                    # Équipements réseau
+EOF
 
 # Construire l'image
 ansible-builder build \
-  --tag mon-registry/mon-ee:latest \
+  --tag mon-registry/mon-ee:1.0.0 \
   --file execution-environment.yml
 
 # Pousser sur votre registry
-docker push mon-registry/mon-ee:latest
+docker push mon-registry/mon-ee:1.0.0
 ```
 
 Puis enregistrez l'image dans AWX comme décrit ci-dessus.
@@ -228,90 +503,163 @@ Puis enregistrez l'image dans AWX comme décrit ci-dessus.
 ## Commandes utiles
 
 ```bash
-# Vérifier l'état de tous les services
+# État de tous les services
 docker compose ps
 
-# Suivre les logs en temps réel
+# Logs en temps réel
 docker compose logs -f
 
-# Redémarrer AWX uniquement
+# Logs d'un service spécifique
+docker compose logs -f awx_web
+docker compose logs -f awx_task
+docker compose logs -f receptor
+
+# Redémarrer AWX (sans toucher la base de données)
 docker compose restart awx_web awx_task
 
-# Arrêter la stack (données conservées)
+# Shell dans le conteneur AWX
+docker compose exec awx_web bash
+
+# Lancer une commande awx-manage
+docker compose exec awx_web awx-manage shell
+
+# Arrêter la stack (données conservées dans les volumes)
 docker compose stop
 
-# Arrêter et supprimer les conteneurs (données conservées dans les volumes)
+# Arrêter et supprimer les conteneurs (volumes conservés)
 docker compose down
 
-# Lancer un shell dans AWX
-docker compose exec awx_web bash
+# Tout supprimer y compris les volumes — IRRÉVERSIBLE
+docker compose down -v
+```
+
+---
+
+## Sauvegarde et restauration
+
+### Sauvegarder
+
+```bash
+#!/usr/bin/env bash
+# Sauvegarde complète — à exécuter avant chaque mise à jour
+BACKUP_DIR="/opt/backups/awx"
+DATE=$(date +%Y%m%d-%H%M%S)
+mkdir -p "$BACKUP_DIR"
+
+# 1. Base de données PostgreSQL
+docker compose exec -T postgres pg_dump \
+  -U "${POSTGRES_USER:-awx}" "${POSTGRES_DB:-awx}" \
+  | gzip > "$BACKUP_DIR/postgres-$DATE.sql.gz"
+
+# 2. Projets AWX (playbooks clonés depuis les SCM)
+docker run --rm \
+  -v autoflow_community_projects:/data \
+  -v "$BACKUP_DIR":/backup \
+  alpine tar czf "/backup/projects-$DATE.tar.gz" -C /data .
+
+echo "Sauvegarde terminée : $BACKUP_DIR"
+ls -lh "$BACKUP_DIR"
+```
+
+> Les **credentials AWX** sont chiffrés en base avec `AWX_SECRET_KEY`. Sauvegardez aussi votre `.env`.
+
+### Restaurer la base de données
+
+```bash
+# Arrêter AWX (mais pas Postgres)
+docker compose stop awx_web awx_task receptor
+
+# Restaurer
+gunzip -c /opt/backups/awx/postgres-YYYYMMDD.sql.gz \
+  | docker compose exec -T postgres psql \
+    -U "${POSTGRES_USER:-awx}" "${POSTGRES_DB:-awx}"
+
+# Redémarrer
+docker compose up -d
 ```
 
 ---
 
 ## Mise à jour
 
-### 1. Vérifier les notes de version
-
-Consultez le [CHANGELOG](CHANGELOG.md) avant toute mise à jour.
-
-### 2. Sauvegarder la base de données
+### 1. Sauvegarder avant tout
 
 ```bash
-docker compose exec postgres pg_dump \
-  -U ${POSTGRES_USER:-awx} ${POSTGRES_DB:-awx} \
-  > backup-$(date +%Y%m%d).sql
+# Voir section Sauvegarde ci-dessus
 ```
 
-### 3. Mettre à jour l'image
+### 2. Vérifier les notes de version
+
+Consultez le [CHANGELOG](CHANGELOG.md) avant toute mise à jour majeure.
+
+### 3. Appliquer la mise à jour
 
 ```bash
-# Modifier AWX_VERSION dans .env, puis :
+# Mettre à jour AWX_VERSION dans .env, puis :
 docker compose pull
 docker compose up -d
 ```
 
-Les migrations de base de données s'appliquent automatiquement au redémarrage via le service `awx_migrate`.
+Les migrations de base de données s'appliquent automatiquement via `awx_migrate` au redémarrage.
+
+### 4. Vérifier
+
+```bash
+docker compose ps           # tous les services doivent être healthy
+docker compose logs awx_web # vérifier l'absence d'erreurs
+```
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                Docker Compose Stack                  │
-│                                                      │
-│  ┌──────────┐    ┌──────────┐    ┌────────────────┐ │
-│  │ awx_web  │    │ awx_task │    │    receptor    │ │
-│  │  :8080   │◄───│          │◄───│  (job runner)  │ │
-│  └──────────┘    └──────────┘    └────────────────┘ │
-│        │               │                 │           │
-│  ┌─────┴───────────────┴─────┐  /var/run/docker.sock │
-│  │        PostgreSQL          │           │           │
-│  │           Redis            │    ┌──────┴──────┐   │
-│  └────────────────────────────┘    │  EE Docker  │   │
-│                                    │  containers │   │
-└─────────────────────────────────────┴─────────────┘
+Internet
+   │  HTTPS :443
+   ▼
+┌──────────────────┐
+│  nginx / Caddy   │  reverse proxy TLS (à configurer sur l'hôte)
+│  (hôte Linux)    │
+└────────┬─────────┘
+         │  HTTP :8080 (loopback)
+         ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    Docker Compose Stack                      │
+│                                                              │
+│  ┌───────────┐    ┌───────────┐    ┌─────────────────────┐  │
+│  │  awx_web  │    │  awx_task │    │      receptor       │  │
+│  │ nginx+    │◄──►│  Celery   │◄──►│  (job runner)       │  │
+│  │ Django    │    │ dispatcher│    │  ansible-runner      │  │
+│  └───────────┘    └───────────┘    └──────────┬──────────┘  │
+│        │                │                     │              │
+│  ┌─────┴────────────────┴─────┐    /var/run/docker.sock     │
+│  │       PostgreSQL 15        │               │              │
+│  │       Redis 7              │    ┌──────────▼──────────┐  │
+│  └────────────────────────────┘    │  EE containers      │  │
+│                                    │  (ephemeral, /tmp)  │  │
+└────────────────────────────────────┴─────────────────────┘
 ```
 
-- **awx_web** : Interface Django + nginx (UI + API REST)
-- **awx_task** : Dispatcher Celery (planification des jobs)
-- **receptor** : Moteur d'exécution des playbooks (lance les conteneurs EE via Docker)
-- **PostgreSQL** : Base de données principale (inventaires, jobs, credentials…)
-- **Redis** : Cache, broker de messages, WebSocket
+- **awx_web** — Interface Django + nginx (UI + API REST v2)
+- **awx_task** — Dispatcher Celery (planification et suivi des jobs)
+- **receptor** — Moteur d'exécution : lance chaque job dans un conteneur EE via le socket Docker
+- **awx_migrate** — Service one-shot : migrations DB + création du compte admin (premier démarrage uniquement)
+- **PostgreSQL** — Base de données principale (inventaires, credentials, jobs, projets…)
+- **Redis** — Cache Django, broker Celery, WebSocket channels
 
 ---
 
 ## Support & Communauté
 
-- **Bug ou question ?** → [GitHub Issues](https://github.com/your-org/autoflow-community/issues)
-- **Discussions** → [GitHub Discussions](https://github.com/your-org/autoflow-community/discussions)
-- **Site officiel** → [autoflow.io](https://autoflow.io)
+- **Bug ou question ?** → [GitHub Issues](https://github.com/getautoflow/autoflow/issues)
+- **Discussions** → [GitHub Discussions](https://github.com/getautoflow/autoflow/discussions)
+- **Site officiel** → [getautoflow.dev](https://getautoflow.dev)
 - **Documentation AWX** → [ansible.readthedocs.io](https://ansible.readthedocs.io/projects/awx/)
+- **Email** → [support@getautoflow.dev](mailto:support@getautoflow.dev)
 
 ### Besoin de plus ?
 
-La **[version Enterprise d'Autoflow](https://autoflow.io/pricing)** ajoute :
+La **[version Enterprise d'Autoflow](https://getautoflow.dev/pricing)** ajoute :
 
 | Fonctionnalité | Community | Enterprise |
 |---|:---:|:---:|
@@ -331,7 +679,7 @@ Les contributions sont les bienvenues ! Consultez [CONTRIBUTING.md](CONTRIBUTING
 
 ```bash
 # Fork + clone
-git clone https://github.com/your-org/autoflow-community.git
+git clone https://github.com/getautoflow/autoflow.git
 
 # Créer une branche
 git checkout -b feat/ma-contribution
@@ -349,6 +697,6 @@ Autoflow Community est distribué sous licence **MIT**. Voir [LICENSE](LICENSE) 
 
 <div align="center">
 
-Fait avec ❤️ par l'équipe [Autoflow](https://autoflow.io) · [autoflow.io](https://autoflow.io)
+Fait avec ❤️ par l'équipe [Autoflow](https://getautoflow.dev) · [getautoflow.dev](https://getautoflow.dev)
 
 </div>

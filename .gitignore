@@ -3,3 +3,7 @@
 
 # Artefacts Docker
 *.tar
+
+# Sauvegardes
+*.sql
+*.sql.gz
