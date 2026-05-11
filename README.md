@@ -194,10 +194,14 @@ getent group docker | cut -d: -f3
 ### 4. Construire et démarrer
 
 ```bash
+# Construire l'image Receptor (une seule fois, ou après modification du Dockerfile)
+docker compose build receptor
+
+# Démarrer la stack
 docker compose up -d
 ```
 
-La première fois, Docker construit l'image Receptor et initialise la base de données AWX (~3–5 minutes). Suivez la progression :
+La première fois, Docker initialise la base de données AWX (~3–5 minutes). Suivez la progression :
 
 ```bash
 docker compose logs -f awx_migrate   # étape 1 : migrations + création admin
