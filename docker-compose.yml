@@ -130,7 +130,7 @@ services:
 
   # ── AWX Migrate — initialisation de la base (one-shot) ─────────────────────
   awx_migrate:
-    image: ghcr.io/autoflow-io/awx:${AWX_VERSION:-24.6.1}
+    image: quay.io/ansible/awx:${AWX_VERSION:-24.6.1}
     container_name: awx_community_migrate
     restart: "no"
     user: root
@@ -151,7 +151,7 @@ services:
 
   # ── AWX Web — interface utilisateur ────────────────────────────────────────
   awx_web:
-    image: ghcr.io/autoflow-io/awx:${AWX_VERSION:-24.6.1}
+    image: quay.io/ansible/awx:${AWX_VERSION:-24.6.1}
     container_name: awx_community_web
     restart: unless-stopped
     hostname: awxweb
@@ -186,7 +186,7 @@ services:
 
   # ── AWX Task — exécution des playbooks Ansible ─────────────────────────────
   awx_task:
-    image: ghcr.io/autoflow-io/awx:${AWX_VERSION:-24.6.1}
+    image: quay.io/ansible/awx:${AWX_VERSION:-24.6.1}
     container_name: awx_community_task
     restart: unless-stopped
     hostname: awx

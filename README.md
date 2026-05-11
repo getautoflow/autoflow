@@ -20,7 +20,7 @@
 
 ## À propos
 
-Autoflow Community est une distribution **prête à l'emploi** d'[AWX](https://github.com/ansible/awx) — l'interface web open-source pour Ansible — packagée avec une image Docker pré-configurée, un `docker-compose.yml` opérationnel et un fichier `.env` documenté.
+Autoflow Community est une distribution **prête à l'emploi** d'[AWX](https://github.com/ansible/awx) — l'interface web open-source pour Ansible — packagée avec l'image officielle AWX (`quay.io/ansible/awx`), un `docker-compose.yml` opérationnel et un fichier `.env` documenté.
 
 L'objectif est simple : vous concentrer sur l'automatisation de votre infrastructure, pas sur l'installation d'AWX.
 
@@ -41,7 +41,7 @@ $ docker compose up -d
 |---|:---:|:---:|:---:|
 | Temps de déploiement | **~5 min** | 2–4 heures | Plusieurs jours |
 | Docker Compose ready | ✅ | ❌ (Kubernetes requis) | ❌ |
-| Image pré-configurée | ✅ | ❌ (à construire) | ✅ |
+| Image officielle AWX | ✅ | ✅ | ✅ |
 | Execution Environments inclus | ✅ | ❌ | ✅ |
 | Sans comptage de nœuds | ✅ | ✅ | ❌ (licence par nœud) |
 | Gratuit pour toujours | ✅ | ✅ | ❌ (~14 000 €/an) |
