@@ -42,7 +42,4 @@ action = 'créé' if created else 'mis à jour'
 print(f'Compte administrateur \"{username}\" {action}.')
 "
 
-log "=== Étape 4 : Données de démo ==="
-awx-manage create_preload_data
-
 log "=== Initialisation terminée — AWX prêt ==="

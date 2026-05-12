@@ -130,7 +130,12 @@ services:
 
   # ── AWX Migrate — initialisation de la base (one-shot) ─────────────────────
   awx_migrate:
-    image: quay.io/ansible/awx:${AWX_VERSION:-24.6.1}
+    build:
+      context: ./config/awx
+      dockerfile: Dockerfile
+      args:
+        AWX_VERSION: ${AWX_VERSION:-24.6.1}
+    image: autoflow/awx-patched:${AWX_VERSION:-24.6.1}
     container_name: awx_community_migrate
     restart: "no"
     user: root
@@ -151,7 +156,12 @@ services:
 
   # ── AWX Web — interface utilisateur ────────────────────────────────────────
   awx_web:
-    image: quay.io/ansible/awx:${AWX_VERSION:-24.6.1}
+    build:
+      context: ./config/awx
+      dockerfile: Dockerfile
+      args:
+        AWX_VERSION: ${AWX_VERSION:-24.6.1}
+    image: autoflow/awx-patched:${AWX_VERSION:-24.6.1}
     container_name: awx_community_web
     restart: unless-stopped
     hostname: awxweb
@@ -171,6 +181,8 @@ services:
     volumes:
       - ./config/awx/settings.py:/etc/tower/settings.py:ro
       - ./config/awx/nginx.conf:/etc/nginx/default.d/awx.conf:ro
+      - ./config/awx/custom/index.html:/var/lib/awx/venv/awx/lib/python3.11/site-packages/awx/ui/build/index.html:ro
+      - ./config/awx/custom:/var/lib/awx/public/static/custom:ro
       - awx_projects:/var/lib/awx/projects
       - receptor_run:/var/run/receptor
     networks:
@@ -186,12 +198,17 @@ services:
 
   # ── AWX Task — exécution des playbooks Ansible ─────────────────────────────
   awx_task:
-    image: quay.io/ansible/awx:${AWX_VERSION:-24.6.1}
+    build:
+      context: ./config/awx
+      dockerfile: Dockerfile
+      args:
+        AWX_VERSION: ${AWX_VERSION:-24.6.1}
+    image: autoflow/awx-patched:${AWX_VERSION:-24.6.1}
     container_name: awx_community_task
     restart: unless-stopped
     hostname: awx
     user: root
-    command: /usr/bin/launch_awx_task_autoflow.sh
+    command: /bin/bash /etc/awx-init/launch_awx_task.sh
     depends_on:
       awx_web:
         condition: service_healthy
@@ -202,6 +219,7 @@ services:
       AWX_TASK_HOSTNAME: awx
     volumes:
       - ./config/awx/settings.py:/etc/tower/settings.py:ro
+      - ./config/awx/launch_awx_task.sh:/etc/awx-init/launch_awx_task.sh:ro
       - awx_projects:/var/lib/awx/projects
       - receptor_run:/var/run/receptor
       - /var/run/docker.sock:/var/run/docker.sock

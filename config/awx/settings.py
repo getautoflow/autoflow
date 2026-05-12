@@ -31,10 +31,10 @@ LISTENER_DATABASES = {
 }
 
 # ── Sécurité ──────────────────────────────────────────────────────────────────
-SECRET_KEY   = os.environ['AWX_SECRET_KEY']
-ALLOWED_HOSTS = ['*']
+SECRET_KEY    = os.environ['AWX_SECRET_KEY']
+ALLOWED_HOSTS = [h.strip() for h in os.environ.get('AWX_ALLOWED_HOSTS', '*').split(',') if h.strip()]
 
-# HTTP simple (pas de TLS en Community) — désactiver les cookies Secure
+# HTTP simple (pas de TLS en Community) — cookies non-secure
 CSRF_COOKIE_SECURE    = False
 SESSION_COOKIE_SECURE = False
 
@@ -45,25 +45,43 @@ _password = os.environ.get('REDIS_PASSWORD', '')
 
 _redis_base = f'redis://:{_password}@{_host}:{_port}' if _password else f'redis://{_host}:{_port}'
 
+BROKER_URL = _redis_base + '/0'
+
 CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {'hosts': [f'{_redis_base}/0']},
+        'CONFIG': {
+            'hosts': [BROKER_URL],
+            'capacity': 10000,
+            'group_expiry': 157784760,
+        },
     }
 }
 
 CACHES = {
     'default': {
-        'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': f'{_redis_base}/1',
+        'BACKEND': 'awx.main.cache.AWXRedisCache',
+        'LOCATION': _redis_base + '/1',
     }
 }
 
-BROKER_URL          = f'{_redis_base}/2'
-CELERY_RESULT_BACKEND = f'{_redis_base}/2'
+# ── Receptor ──────────────────────────────────────────────────────────────────
+RECEPTOR_SOCKET_PATH = '/var/run/receptor/receptor.sock'
+
+# ── WebSocket inter-conteneurs (awx_task → awx_web) ──────────────────────────
+# AWX production assume HTTPS/443 par défaut.
+# En Community on n'a pas de TLS — on force HTTP/80.
+BROADCAST_WEBSOCKET_PROTOCOL    = 'http'
+BROADCAST_WEBSOCKET_PORT        = 80
+BROADCAST_WEBSOCKET_VERIFY_CERT = False
+
+TOWER_URL_BASE = 'http://awxweb'
+
+# ── Branding ──────────────────────────────────────────────────────────────────
+LOGOUT_REDIRECT_URL = '/'
+LOGIN_URL = '/'
 
 # ── Exécution des jobs ────────────────────────────────────────────────────────
-# AWX 24+ utilise Docker via le socket bind-monté (pas Podman)
 CONTAINER_RUNTIME = 'docker'
 
 DEFAULT_CONTAINER_RUN_OPTIONS = [

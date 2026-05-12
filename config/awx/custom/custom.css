@@ -1,0 +1,148 @@
+/* ── Autoflow custom theme ─────────────────────────────────────── */
+
+/* ── Logo : icône seule — le texte est injecté par JS dans index.html ── */
+img.pf-c-brand,
+img.pf-v5-c-brand,
+.pf-c-page__header-brand img,
+.pf-v5-c-page__header-brand img,
+img[alt="AWX"],
+img[src*="brand-logo"] {
+  content: url("/static/custom/logo.png") !important;
+  height: 36px !important;
+  width: auto !important;
+}
+
+/* Texte HTML injecté par JS à côté de l'icône */
+.af-brand-text { display:flex; flex-direction:column; justify-content:center; line-height:1.2; }
+.af-brand-name { font-size:16px; font-weight:700; color:#fff; letter-spacing:-.3px; font-family:'Segoe UI',system-ui,sans-serif; }
+.af-brand-sub  { font-size:10.5px; color:rgba(255,255,255,.45); letter-spacing:.4px; font-family:'Segoe UI',system-ui,sans-serif; margin-top:2px; }
+
+/* ── Header ── */
+.pf-c-page__header,
+.pf-v5-c-page__header {
+  background-color: #151515 !important;
+  border-bottom: 1px solid #252525 !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,.5) !important;
+  min-height: 64px !important;
+}
+
+/* Bouton hamburger */
+.pf-c-button.pf-m-plain,
+.pf-v5-c-button.pf-m-plain {
+  color: #aaa !important;
+  font-size: 18px !important;
+}
+.pf-c-button.pf-m-plain:hover,
+.pf-v5-c-button.pf-m-plain:hover {
+  color: #fff !important;
+}
+
+/* Icônes + texte header droite */
+.pf-c-page__header-tools,
+.pf-v5-c-page__header-tools {
+  color: #ccc !important;
+  font-size: 15px !important;
+}
+.pf-c-page__header-tools .pf-c-dropdown__toggle,
+.pf-v5-c-page__header-tools .pf-v5-c-dropdown__toggle {
+  font-size: 15px !important;
+  color: #ccc !important;
+}
+
+/* ── Sidebar ── */
+.pf-c-page__sidebar,
+.pf-v5-c-page__sidebar {
+  background-color: #1b1b1b !important;
+  border-right: 1px solid #252525 !important;
+}
+
+/* ── Navigation ── */
+.pf-c-nav,
+.pf-v5-c-nav {
+  background-color: transparent !important;
+}
+
+/* Titres de sections */
+.pf-c-nav__section-title,
+.pf-v5-c-nav__section-title {
+  color: #555 !important;
+  font-size: 11px !important;
+  letter-spacing: 1.4px !important;
+  text-transform: uppercase !important;
+  padding-top: 20px !important;
+}
+
+/* Liens nav */
+.pf-c-nav__link,
+.pf-v5-c-nav__link {
+  color: #999 !important;
+  border-left: 3px solid transparent !important;
+  padding-left: 22px !important;
+  font-size: 15px !important;
+  line-height: 1.5 !important;
+  padding-top: 10px !important;
+  padding-bottom: 10px !important;
+}
+.pf-c-nav__link:hover,
+.pf-v5-c-nav__link:hover {
+  background-color: #242424 !important;
+  color: #fff !important;
+  border-left-color: #444 !important;
+}
+.pf-c-nav__link.pf-m-current,
+.pf-v5-c-nav__link.pf-m-current {
+  background-color: #1f1f1f !important;
+  color: #fff !important;
+  border-left-color: transparent !important;
+  font-weight: 600 !important;
+}
+/* Supprime le pseudo-élément ::before qui génère la barre colorée */
+.pf-c-nav__link::before,
+.pf-v5-c-nav__link::before {
+  display: none !important;
+}
+
+/* Flèches groupes repliables */
+.pf-c-nav__toggle,
+.pf-v5-c-nav__toggle {
+  color: #666 !important;
+  font-size: 15px !important;
+}
+.pf-c-nav__item.pf-m-expandable.pf-m-expanded > .pf-c-nav__link,
+.pf-v5-c-nav__item.pf-m-expandable.pf-m-expanded > .pf-v5-c-nav__link {
+  color: #ddd !important;
+}
+
+/* Sous-menus */
+.pf-c-nav__subnav,
+.pf-v5-c-nav__subnav {
+  background-color: #141414 !important;
+  border-left: none !important;
+}
+.pf-c-nav__subnav .pf-c-nav__link,
+.pf-v5-c-nav__subnav .pf-v5-c-nav__link {
+  font-size: 14px !important;
+  color: #777 !important;
+  padding-left: 32px !important;
+}
+.pf-c-nav__subnav .pf-c-nav__link.pf-m-current,
+.pf-v5-c-nav__subnav .pf-v5-c-nav__link.pf-m-current {
+  color: #fff !important;
+ 
+}
+
+/* ── Contenu principal : réinitialise la couleur de texte sur fond blanc ── */
+.pf-c-page__main,
+.pf-v5-c-page__main,
+.pf-c-page__main-section,
+.pf-v5-c-page__main-section {
+  color: var(--pf-global--Color--100, #151515) !important;
+}
+
+/* ── Masquer la bannière "tech preview" du nouveau UI AWX ── */
+/* AWX utilise pf-c-banner (pas pf-c-alert) avec variant info */
+.pf-c-banner.pf-m-info:has(a[href*="ui_next"]),
+.pf-c-banner:has(a[href="/ui_next"]),
+.pf-v5-c-banner.pf-m-info:has(a[href*="ui_next"]) {
+  display: none !important;
+}

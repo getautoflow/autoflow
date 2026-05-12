@@ -1,0 +1,307 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Autoflow</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    #af-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 999999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(ellipse at 30% 60%, #0d2e5a 0%, #060f1e 70%);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      transition: opacity .4s ease;
+    }
+    #af-overlay.af-hide { opacity: 0; pointer-events: none; }
+
+    #af-overlay::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(30,120,255,.07) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(30,120,255,.07) 1px, transparent 1px);
+      background-size: 48px 48px;
+      animation: af-grid 20s linear infinite;
+    }
+    @keyframes af-grid { from { background-position: 0 0; } to { background-position: 48px 48px; } }
+
+    .af-orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: .18;
+      animation: af-float 8s ease-in-out infinite;
+    }
+    .af-orb-1 { width: 500px; height: 500px; background: #1e78ff; top: -100px; left: -100px; animation-delay: 0s; }
+    .af-orb-2 { width: 350px; height: 350px; background: #00d4ff; bottom: -80px; right: 10%; animation-delay: -3s; }
+    .af-orb-3 { width: 250px; height: 250px; background: #7c3aed; top: 30%; right: -60px; animation-delay: -6s; }
+    @keyframes af-float {
+      0%, 100% { transform: translateY(0); }
+      50%       { transform: translateY(-30px); }
+    }
+
+    .af-card {
+      position: relative;
+      z-index: 1;
+      width: 420px;
+      padding: 48px 44px 44px;
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.10);
+      border-radius: 20px;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 32px 80px rgba(0,0,0,.5), 0 0 0 1px rgba(30,120,255,.08) inset;
+    }
+
+    .af-logo {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 32px;
+    }
+    .af-logo img { flex-shrink: 0; width:48px;height:48px;object-fit:contain; }
+    .af-logo-text { line-height: 1; }
+    .af-logo-name {
+      font-size: 24px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: -.3px;
+    }
+    .af-logo-tagline {
+      font-size: 11px;
+      color: rgba(255,255,255,.45);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-top: 3px;
+    }
+
+    .af-heading {
+      font-size: 22px;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 6px;
+    }
+    .af-sub {
+      font-size: 13.5px;
+      color: rgba(255,255,255,.45);
+      margin-bottom: 32px;
+    }
+
+    .af-field { margin-bottom: 18px; }
+    .af-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: rgba(255,255,255,.55);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+    .af-input {
+      width: 100%;
+      padding: 12px 16px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 10px;
+      color: #fff;
+      font-size: 15px;
+      outline: none;
+      transition: border-color .2s, background .2s, box-shadow .2s;
+    }
+    .af-input::placeholder { color: rgba(255,255,255,.25); }
+    .af-input:focus {
+      border-color: #1e78ff;
+      background: rgba(30,120,255,.07);
+      box-shadow: 0 0 0 3px rgba(30,120,255,.18);
+    }
+
+    .af-btn {
+      width: 100%;
+      padding: 14px;
+      margin-top: 8px;
+      background: linear-gradient(135deg, #1e78ff 0%, #0055e0 100%);
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      letter-spacing: .2px;
+      transition: opacity .2s, transform .1s;
+    }
+    .af-btn:hover  { opacity: .9; }
+    .af-btn:active { transform: scale(.98); }
+    .af-btn:disabled { opacity: .5; cursor: not-allowed; }
+    .af-btn-inner { display: flex; align-items: center; justify-content: center; gap: 8px; }
+
+    .af-spinner {
+      display: none;
+      width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: af-spin .7s linear infinite;
+    }
+    .af-btn.af-loading .af-spinner { display: block; }
+    .af-btn.af-loading .af-btn-label { opacity: .6; }
+    @keyframes af-spin { to { transform: rotate(360deg); } }
+
+    .af-error {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      background: rgba(239,68,68,.12);
+      border: 1px solid rgba(239,68,68,.3);
+      border-radius: 8px;
+      color: #fca5a5;
+      font-size: 13px;
+      margin-bottom: 18px;
+    }
+    .af-error.af-show { display: flex; }
+
+    .af-footer {
+      margin-top: 28px;
+      text-align: center;
+      font-size: 12px;
+      color: rgba(255,255,255,.2);
+      border-top: 1px solid rgba(255,255,255,.06);
+      padding-top: 20px;
+    }
+    .af-footer span { color: rgba(255,255,255,.35); }
+
+    .af-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      background: rgba(30,120,255,.15);
+      border: 1px solid rgba(30,120,255,.25);
+      border-radius: 20px;
+      color: rgba(100,160,255,.8);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .5px;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+    }
+    .af-badge-dot {
+      width: 6px; height: 6px;
+      background: #1e78ff;
+      border-radius: 50%;
+      animation: af-pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes af-pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: .4; transform: scale(.8); }
+    }
+  </style>
+  <script>
+  (function () {
+    var overlay = document.createElement('div');
+    overlay.id = 'af-overlay';
+    overlay.innerHTML =
+      '<div class="af-orb af-orb-1"></div>' +
+      '<div class="af-orb af-orb-2"></div>' +
+      '<div class="af-orb af-orb-3"></div>' +
+      '<div class="af-card">' +
+        '<div class="af-logo">' +
+          '<img src="/static/custom/logo.png" alt="Autoflow"/>' +
+          '<div class="af-logo-text">' +
+            '<div class="af-logo-name">Autoflow</div>' +
+            '<div class="af-logo-tagline">Automation Platform</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="af-badge"><span class="af-badge-dot"></span>Secure Access</div>' +
+        '<div class="af-heading">Welcome back</div>' +
+        '<div class="af-sub">Sign in to manage your automation workflows</div>' +
+        '<div class="af-error" id="af-err">' +
+          '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="#f87171" stroke-width="1.5"/><path d="M8 5v3.5M8 11h.01" stroke="#f87171" stroke-width="1.5" stroke-linecap="round"/></svg>' +
+          '<span id="af-err-msg">Invalid username or password.</span>' +
+        '</div>' +
+        '<form id="af-form" autocomplete="on">' +
+          '<div class="af-field">' +
+            '<label class="af-label" for="af-user">Username</label>' +
+            '<input class="af-input" id="af-user" name="username" type="text" placeholder="Enter your username" autocomplete="username" required>' +
+          '</div>' +
+          '<div class="af-field">' +
+            '<label class="af-label" for="af-pass">Password</label>' +
+            '<input class="af-input" id="af-pass" name="password" type="password" placeholder="Enter your password" autocomplete="current-password" required>' +
+          '</div>' +
+          '<button class="af-btn" id="af-submit" type="submit">' +
+            '<div class="af-btn-inner">' +
+              '<div class="af-spinner"></div>' +
+              '<span class="af-btn-label">Sign In</span>' +
+            '</div>' +
+          '</button>' +
+        '</form>' +
+        '<div class="af-footer">Powered by <span>AWX</span> &amp; <span>Ansible</span></div>' +
+      '</div>';
+
+    function mount() {
+      document.body.appendChild(overlay);
+      document.getElementById('af-form').addEventListener('submit', handleLogin);
+    }
+    if (document.body) { mount(); }
+    else { document.addEventListener('DOMContentLoaded', mount); }
+
+    async function getCsrf() {
+      try { await fetch('/api/v2/config/', { credentials: 'same-origin' }); } catch (e) {}
+      var m = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+      return m ? m[1] : '';
+    }
+
+    async function handleLogin(e) {
+      e.preventDefault();
+      var btn  = document.getElementById('af-submit');
+      var err  = document.getElementById('af-err');
+      var user = document.getElementById('af-user').value.trim();
+      var pass = document.getElementById('af-pass').value;
+
+      btn.disabled = true;
+      btn.classList.add('af-loading');
+      err.classList.remove('af-show');
+
+      try {
+        var csrf = await getCsrf();
+        var resp = await fetch('/api/login/', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': csrf,
+            'Referer': window.location.href
+          },
+          body: new URLSearchParams({ username: user, password: pass, next: '/' }).toString(),
+          redirect: 'manual'
+        });
+        if (resp.ok || resp.status === 0 || resp.type === 'opaqueredirect') {
+          overlay.classList.add('af-hide');
+          setTimeout(function () { overlay.remove(); }, 450);
+        } else {
+          showError('Invalid username or password.');
+        }
+      } catch (ex) {
+        showError('Connection error \u2014 please try again.');
+      } finally {
+        btn.disabled = false;
+        btn.classList.remove('af-loading');
+      }
+    }
+
+    function showError(msg) {
+      document.getElementById('af-err-msg').textContent = msg;
+      document.getElementById('af-err').classList.add('af-show');
+    }
+  })();
+  </script>
+  <script defer="defer" src="/static/awx/c827f71c4129e50b690c.js"></script>
+</head>
+<body></body>
+</html>

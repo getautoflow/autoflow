@@ -1,0 +1,462 @@
+{% load static %}<!doctype html><html lang="en"><head><script nonce="{{ csp_nonce }}" type="text/javascript">window.NONCE_ID="{{ csp_nonce }}"</script><meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' ws: wss:; style-src 'self' 'unsafe-inline'; script-src 'self' 'nonce-{{ csp_nonce }}' *.pendo.io; img-src 'self' *.pendo.io data:; worker-src 'self' blob: ;"/><link rel="shortcut icon" href="{% static 'media/favicon.ico' %}"/><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><meta name="theme-color" content="#151515"/><title>Autoflow</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+/* Fond sombre dès la première peinture — impossible d'avoir un flash blanc. */
+html,body{background:#151515!important}
+body{font-family:RedHatText,'Red Hat Text','Overpass',overpass,helvetica,arial,sans-serif}
+
+/* Neutralise TOTALEMENT les écrans d'auth natifs d'AWX — on ne s'en sert jamais.
+   Couvre les classes PatternFly v4 et v5, ainsi que les conteneurs de login React. */
+.pf-c-login,.pf-v5-c-login,
+.pf-c-login__container,.pf-v5-c-login__container,
+.pf-c-login__main,.pf-v5-c-login__main,
+form[name="login_form"],
+[data-cy="login-form"]{
+  display:none!important;
+  visibility:hidden!important;
+  opacity:0!important;
+  pointer-events:none!important;
+}
+
+/* ── Splash (écran de chargement instantané) ──
+   Monté immédiatement, sert de couverture le temps que checkAuth décide.
+   Garde le même look que l'overlay de login → transition visuellement continue. */
+#af-splash{
+  position:fixed;inset:0;z-index:999998;
+  background:#151515;
+  display:flex;align-items:center;justify-content:center;
+  transition:opacity .35s ease;
+}
+#af-splash.af-hide{opacity:0;pointer-events:none}
+.af-splash-inner{display:flex;flex-direction:column;align-items:center;gap:20px}
+.af-splash-logo{width:72px;height:72px;object-fit:contain}
+.af-splash-title{font-size:22px;font-weight:700;color:#fff;letter-spacing:-.3px}
+.af-splash-sub{font-size:13px;color:#6a6a6a;margin-top:-14px}
+.af-splash-spin{
+  width:28px;height:28px;margin-top:8px;
+  border:3px solid rgba(255,255,255,.12);border-top-color:#ee0000;
+  border-radius:50%;animation:af-spin .8s linear infinite;
+}
+
+/* ── Overlay ── */
+#af-overlay{
+  position:fixed;inset:0;z-index:999999;
+  display:flex;
+  background:#151515;
+  transition:opacity .35s ease;
+}
+#af-overlay.af-hide{opacity:0;pointer-events:none}
+
+/* ── Left panel ── */
+.af-left{
+  flex:0 0 45%;
+  display:flex;flex-direction:column;justify-content:center;align-items:flex-start;
+  padding:64px 56px;
+  background:#1b1b1b;
+  border-right:1px solid #2a2a2a;
+  position:relative;
+  overflow:hidden;
+}
+.af-left::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(160deg,rgba(238,0,0,.07) 0%,transparent 60%);
+}
+
+.af-brand{position:relative;z-index:1;margin-bottom:48px}
+.af-brand-logo{display:flex;align-items:center;gap:16px;margin-bottom:20px}
+.af-brand-name{
+  font-size:28px;font-weight:700;color:#fff;letter-spacing:-.5px;line-height:1.1;
+}
+.af-brand-sub{font-size:13px;color:#8a8a8a;margin-top:2px;letter-spacing:.3px}
+
+.af-tagline{
+  font-size:15px;color:#6a6a6a;line-height:1.6;
+  max-width:320px;
+  position:relative;z-index:1;
+}
+.af-tagline strong{color:#aaa;font-weight:500}
+
+.af-features{margin-top:40px;display:flex;flex-direction:column;gap:14px;position:relative;z-index:1}
+.af-feat{display:flex;align-items:center;gap:12px;color:#777;font-size:13px}
+.af-feat-dot{width:6px;height:6px;border-radius:50%;background:#ee0000;flex-shrink:0}
+
+/* ── Right panel ── */
+.af-right{
+  flex:1;
+  display:flex;flex-direction:column;justify-content:center;align-items:center;
+  padding:64px 48px;
+  background:#151515;
+}
+
+.af-form-wrap{width:100%;max-width:360px}
+
+.af-form-title{
+  font-size:20px;font-weight:600;color:#fff;
+  margin-bottom:6px;
+}
+.af-form-sub{font-size:13.5px;color:#6a6a6a;margin-bottom:32px}
+
+/* Error */
+.af-error{
+  display:none;align-items:center;gap:8px;
+  padding:10px 14px;
+  background:rgba(238,0,0,.1);border:1px solid rgba(238,0,0,.25);
+  border-radius:4px;color:#f58a8a;font-size:13px;margin-bottom:20px;
+}
+.af-error.af-show{display:flex}
+
+/* Fields */
+.af-field{margin-bottom:20px}
+.af-label{
+  display:block;font-size:13px;font-weight:500;color:#ccc;
+  margin-bottom:8px;
+}
+.af-input{
+  width:100%;padding:10px 14px;
+  background:#1e1e1e;border:1px solid #333;
+  border-radius:4px;color:#fff;font-size:14px;outline:none;
+  transition:border-color .15s,box-shadow .15s;
+}
+.af-input::placeholder{color:#555}
+.af-input:focus{border-color:#ee0000;box-shadow:0 0 0 2px rgba(238,0,0,.18)}
+
+/* Button */
+.af-btn{
+  width:100%;padding:11px;
+  background:#ee0000;border:none;border-radius:4px;
+  color:#fff;font-size:14px;font-weight:600;cursor:pointer;
+  letter-spacing:.2px;
+  transition:background .15s,transform .1s;
+}
+.af-btn:hover{background:#cc0000}
+.af-btn:active{transform:scale(.99)}
+.af-btn:disabled{opacity:.5;cursor:not-allowed}
+.af-btn-inner{display:flex;align-items:center;justify-content:center;gap:8px}
+.af-spinner{
+  display:none;width:16px;height:16px;
+  border:2px solid rgba(255,255,255,.3);border-top-color:#fff;
+  border-radius:50%;animation:af-spin .7s linear infinite;
+}
+.af-btn.af-loading .af-spinner{display:block}
+.af-btn.af-loading .af-btn-label{opacity:.6}
+@keyframes af-spin{to{transform:rotate(360deg)}}
+
+/* Footer */
+.af-right-footer{
+  position:absolute;bottom:24px;
+  font-size:12px;color:#444;text-align:center;
+}
+.af-right-footer span{color:#555}
+
+/* Responsive */
+@media(max-width:700px){
+  .af-left{display:none}
+  .af-right{padding:40px 24px}
+}
+.app{height:100%}
+/* #app est opaque=0 par défaut ; révélé uniquement quand l'auth est confirmée.
+   Cela empêche TOUT rendu React d'AWX d'être visible tant qu'on n'a pas tranché.
+   Combiné au splash et au display:none sur .pf-v5-c-login, aucun flash n'est
+   possible, quel que soit le chemin (login, logout, reload, navigation). */
+#app{opacity:0;transition:opacity .25s ease}
+#app.af-ready{opacity:1}
+</style>
+<script nonce="{{ csp_nonce }}">(function(){
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Auth gate — /api/v2/me/ est la source de vérité (jamais le cookie custom).
+   Le cookie userLoggedIn n'est qu'un indicateur UX optionnel.
+   ────────────────────────────────────────────────────────────────────────── */
+var authed=false;            // décision finale
+var overlayMounted=false;
+var splashEl=null;
+
+function cookieVal(n){var m=document.cookie.match('(?:^|;)\\s*'+n+'=([^;]+)');return m?m[1]:null;}
+function delCookie(n){document.cookie=n+'=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';}
+function revealApp(){var a=document.getElementById('app');if(a)a.classList.add('af-ready');}
+function hideApp(){var a=document.getElementById('app');if(a)a.classList.remove('af-ready');}
+
+/* ── Splash : monté IMMÉDIATEMENT pour couvrir le viewport pendant qu'on décide.
+   Attaché à <html> si <body> n'existe pas encore (le script est dans <head>). */
+var SPLASH_SVG='<img class="af-splash-logo" src="/static/custom/logo.png" alt="Autoflow"/>';
+
+function mountSplash(){
+  if(splashEl)return splashEl;
+  splashEl=document.createElement('div');
+  splashEl.id='af-splash';
+  splashEl.innerHTML='<div class="af-splash-inner">'+SPLASH_SVG
+    +'<div class="af-splash-title">Autoflow</div>'
+    +'<div class="af-splash-sub">Automation Platform</div>'
+    +'<div class="af-splash-spin"></div>'
+    +'</div>';
+  var parent=document.body||document.documentElement;
+  parent.appendChild(splashEl);
+  return splashEl;
+}
+function hideSplash(){
+  if(!splashEl)return;
+  splashEl.classList.add('af-hide');
+  setTimeout(function(){if(splashEl&&splashEl.parentNode){splashEl.parentNode.removeChild(splashEl);splashEl=null;}},400);
+}
+function showSplashNow(){
+  /* Force-remontage du splash (ex: logout en cours) */
+  if(splashEl){splashEl.classList.remove('af-hide');return;}
+  mountSplash();
+}
+
+/* Montage immédiat — avant tout le reste */
+mountSplash();
+/* Filet si <body> arrive après : on re-tente au DOMContentLoaded */
+if(!document.body){
+  document.addEventListener('DOMContentLoaded',function(){
+    if(splashEl&&splashEl.parentNode!==document.body){
+      document.body.appendChild(splashEl);
+    }
+  });
+}
+
+/* Nettoie toute URL /login variants → racine */
+function isLoginUrl(){
+  var h=location.hash||'', p=location.pathname||'';
+  return /^#\/login(\?|\/|$)/.test(h) || /^\/login(\?|\/|$)/.test(p);
+}
+function cleanLoginUrl(){
+  if(isLoginUrl()){
+    try{history.replaceState(null,'','/');}catch(e){}
+    if(location.hash)location.hash='';
+  }
+}
+
+/* Vérification API sans cache — seule source de vérité */
+function checkAuth(){
+  return fetch('/api/v2/me/',{
+    credentials:'same-origin',
+    cache:'no-store',
+    headers:{'Accept':'application/json','Pragma':'no-cache','Cache-Control':'no-cache'}
+  }).then(function(r){return r.ok;}).catch(function(){return false;});
+}
+
+checkAuth().then(function(ok){
+  authed=ok;
+  if(ok){
+    /* Connecté : nettoyer l'URL, révéler #app, puis fade-out du splash.
+       On laisse un micro-délai pour que le dashboard soit rendu avant le fade. */
+    cleanLoginUrl();
+    revealApp();
+    /* Attend que le DOM de l'app soit peint pour éviter un "trou" noir */
+    setTimeout(hideSplash,120);
+  } else {
+    /* Non connecté : monter l'overlay de login PAR DESSUS le splash,
+       puis retirer le splash (transition invisible car même fond). */
+    delCookie('userLoggedIn');
+    cleanLoginUrl();
+    mount();
+    /* L'overlay et le splash partagent le fond #151515 → aucune discontinuité */
+    requestAnimationFrame(function(){requestAnimationFrame(hideSplash);});
+  }
+});
+
+function mount(){
+  if(overlayMounted)return;
+  overlayMounted=true;
+  var o=document.createElement('div');
+  o.id='af-overlay';
+  o.innerHTML=
+    '<div class="af-left">'
+    +'<div class="af-brand">'
+    +'<div class="af-brand-logo">'
+    +'<img src="/static/custom/logo.png" width="52" height="52" style="object-fit:contain" alt="Autoflow"/>'
+    +'<div>'
+    +'<div class="af-brand-name">Autoflow</div>'
+    +'<div class="af-brand-sub">Automation Platform</div>'
+    +'</div>'
+    +'</div>'
+    +'</div>'
+    +'<p class="af-tagline">Centralize, automate and orchestrate your <strong>IT infrastructure</strong> with a unified platform powered by Ansible.</p>'
+    +'<div class="af-features">'
+    +'<div class="af-feat"><span class="af-feat-dot"></span>Job templates &amp; workflow automation</div>'
+    +'<div class="af-feat"><span class="af-feat-dot"></span>Inventory &amp; credential management</div>'
+    +'<div class="af-feat"><span class="af-feat-dot"></span>Real-time execution monitoring</div>'
+    +'<div class="af-feat"><span class="af-feat-dot"></span>RBAC &amp; audit logging</div>'
+    +'</div>'
+    +'</div>'
+
+    +'<div class="af-right">'
+    +'<div class="af-form-wrap">'
+    +'<div class="af-form-title">Sign in</div>'
+    +'<div class="af-form-sub">Use your Autoflow credentials to continue</div>'
+    +'<div class="af-error" id="af-err">'
+    +'<svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="7.5" r="6.5" stroke="#f87171" stroke-width="1.4"/><path d="M7.5 4.5v3.2M7.5 10.5h.01" stroke="#f87171" stroke-width="1.4" stroke-linecap="round"/></svg>'
+    +'<span id="af-msg">Invalid username or password.</span>'
+    +'</div>'
+    +'<form id="af-form" autocomplete="on">'
+    +'<div class="af-field"><label class="af-label" for="af-u">Username</label>'
+    +'<input class="af-input" id="af-u" type="text" placeholder="admin" autocomplete="username" required></div>'
+    +'<div class="af-field"><label class="af-label" for="af-p">Password</label>'
+    +'<input class="af-input" id="af-p" type="password" placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" autocomplete="current-password" required></div>'
+    +'<button class="af-btn" id="af-btn" type="submit">'
+    +'<div class="af-btn-inner"><div class="af-spinner"></div><span class="af-btn-label">Log In</span></div>'
+    +'</button>'
+    +'</form>'
+    +'</div>'
+    +'<div class="af-right-footer">Powered by <span>AWX</span> &amp; <span>Ansible</span></div>'
+    +'</div>';
+
+  document.body?document.body.appendChild(o):document.addEventListener('DOMContentLoaded',function(){document.body.appendChild(o);});
+  document.getElementById('af-form').addEventListener('submit',login);
+}
+
+async function getCsrf(){
+  try{await fetch('/api/v2/config/',{credentials:'same-origin'});}catch(e){}
+  var m=document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+  return m?m[1]:'';
+}
+
+async function login(e){
+  e.preventDefault();
+  var btn=document.getElementById('af-btn'),err=document.getElementById('af-err');
+  var u=document.getElementById('af-u').value.trim(),p=document.getElementById('af-p').value;
+  btn.disabled=true;btn.classList.add('af-loading');err.classList.remove('af-show');
+  try{
+    var csrf=await getCsrf();
+    var r=await fetch('/api/login/',{
+      method:'POST',credentials:'same-origin',
+      headers:{'Content-Type':'application/x-www-form-urlencoded','X-CSRFToken':csrf,'Referer':window.location.href},
+      body:new URLSearchParams({username:u,password:p,next:'/'}).toString(),
+      redirect:'follow'
+    });
+    /* redirect:follow → Django sets session cookie and follows to /
+       If final response is our own page (200) → login succeeded */
+    if(r.ok){
+      document.cookie='userLoggedIn=true; path=/';
+      /* Nettoie tout #/login résiduel avant recharge */
+      try{history.replaceState(null,'','/');}catch(e){}
+      window.location.replace('/');
+    } else {
+      showErr('Invalid username or password.');
+    }
+  }catch(ex){showErr('Connection error \u2014 please try again.');}
+  finally{btn.disabled=false;btn.classList.remove('af-loading');}
+}
+function showErr(m){document.getElementById('af-msg').textContent=m;document.getElementById('af-err').classList.add('af-show');}
+
+/* ── Remplace l'img AWX par icône + texte HTML pur ── */
+function injectBrandText(){
+  var img=document.querySelector(
+    '.pf-c-page__header-brand img,.pf-v5-c-page__header-brand img'
+  );
+  if(!img||img.dataset.afDone)return;
+  img.dataset.afDone='1';
+  var wrap=document.createElement('div');
+  wrap.style.cssText='display:flex;align-items:center;gap:10px;';
+  var txt=document.createElement('div');
+  txt.className='af-brand-text';
+  txt.innerHTML='<div class="af-brand-name">Autoflow</div><div class="af-brand-sub">Automate Platform</div>';
+  img.parentNode.insertBefore(wrap,img);
+  wrap.appendChild(img);
+  wrap.appendChild(txt);
+}
+var brandObs=new MutationObserver(function(){
+  injectBrandText();
+  if(document.querySelector('.pf-c-page__header-brand img[data-af-done],.pf-v5-c-page__header-brand img[data-af-done]'))brandObs.disconnect();
+});
+brandObs.observe(document.documentElement,{childList:true,subtree:true});
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Interception du logout — AWX gère le logout côté client (fetch /api/logout/
+   puis navigation vers #/login). On capture l'appel pour : 1) effacer le
+   cookie userLoggedIn résiduel, 2) forcer un rechargement propre vers '/'
+   qui re-évalue l'auth et montre NOTRE overlay.
+   ────────────────────────────────────────────────────────────────────────── */
+function beginLogout(){
+  /* Étape synchrone — exécutée AVANT que le fetch/XHR ne résolve, donc avant
+     qu'AWX n'ait le temps de re-rendre son formulaire de login dans #app. */
+  authed=false;
+  delCookie('userLoggedIn');
+  hideApp();        /* opacity:0 sur #app */
+  showSplashNow();  /* splash dark par-dessus, couvre tout */
+}
+function finishLogout(){
+  try{history.replaceState(null,'','/');}catch(e){}
+  window.location.replace('/');
+}
+
+var _fetch=window.fetch;
+window.fetch=function(input,init){
+  var url=(typeof input==='string')?input:(input&&input.url)||'';
+  var isLogout=/\/api\/logout\/?(\?|$)/.test(url);
+  if(isLogout)beginLogout();
+  var p=_fetch.apply(this,arguments);
+  if(isLogout)p.then(finishLogout,finishLogout);
+  return p;
+};
+/* Idem pour XHR (axios / versions AWX historiques) */
+var _open=XMLHttpRequest.prototype.open;
+XMLHttpRequest.prototype.open=function(method,url){
+  if(/\/api\/logout\/?(\?|$)/.test(String(url||''))){
+    beginLogout();
+    this.addEventListener('loadend',finishLogout);
+  }
+  return _open.apply(this,arguments);
+};
+/* Intercept aussi les clics sur les liens <a href="/api/logout/"> (logout natif Django) */
+document.addEventListener('click',function(ev){
+  var a=ev.target&&ev.target.closest&&ev.target.closest('a[href*="/api/logout"]');
+  if(a){beginLogout();}
+},true);
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Interception des navigations vers /login — seulement si authentifié
+   (quand l'overlay est monté, on laisse l'utilisateur terminer son login).
+   ────────────────────────────────────────────────────────────────────────── */
+function guardLoginRoute(){
+  if(!isLoginUrl())return;
+  /* Dans tous les cas : cacher #app + remonter splash pour éviter tout flash. */
+  hideApp();
+  showSplashNow();
+  if(authed){
+    /* Session vivante mais AWX a routé vers /login (redirection interne suite
+       à logout ou expiration) → forcer un rechargement propre qui re-passera
+       par le gate d'auth. location.replace() > replaceState() car ce dernier
+       ne défait pas le rendu React déjà en cours. */
+    window.location.replace('/');
+  }
+  /* Si !authed : notre overlay de login est déjà monté (ou le sera via mount()),
+     le splash s'efface ensuite dans checkAuth().then(). Rien à faire ici. */
+}
+window.addEventListener('hashchange',guardLoginRoute);
+window.addEventListener('popstate',guardLoginRoute);
+['pushState','replaceState'].forEach(function(m){
+  var orig=history[m].bind(history);
+  history[m]=function(){orig.apply(this,arguments);guardLoginRoute();};
+});
+
+/* Filet de sécurité : si l'app AWX injecte son login dans le DOM, on est
+   soit en transition logout (session expirée), soit au démarrage avant
+   que checkAuth n'ait tranché. Le display:none CSS l'empêche déjà de
+   s'afficher, mais on recharge proprement pour repasser par le gate. */
+var loginObs=new MutationObserver(function(){
+  if(document.querySelector('.pf-c-login,.pf-v5-c-login')){
+    /* On est déjà protégés par le CSS — mais si on est authentifié,
+       on déclenche le flow logout pour recharger proprement. */
+    if(authed){
+      loginObs.disconnect();
+      beginLogout();
+      finishLogout();
+    }
+  }
+});
+loginObs.observe(document.documentElement,{childList:true,subtree:true});
+
+/* ── Supprime la bannière "tech preview ui_next" dès qu'elle apparaît ── */
+/* AWX utilise pf-c-banner (pas pf-c-alert) — ne pas disconnect car SPA */
+var previewObs=new MutationObserver(function(){
+  document.querySelectorAll('a[href="/ui_next"],a[href*="ui_next"]').forEach(function(a){
+    var banner=a.closest('.pf-c-banner,.pf-v5-c-banner');
+    if(banner){banner.style.display='none';}
+  });
+});
+previewObs.observe(document.documentElement,{childList:true,subtree:true});
+
+})();</script>
+<link rel="stylesheet" href="/static/custom/custom.css"><script defer="defer" src="./static/js/main.be3da92f.js"></script><link href="./static/css/main.bcaaa591.css" rel="stylesheet"></head><body><noscript>You need to enable JavaScript to run this app.</noscript><style nonce="{{ csp_nonce }}">.app{height:100%}</style><div id="app" class="app"></div></body></html>

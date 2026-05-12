@@ -9,10 +9,10 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![AWX](https://img.shields.io/badge/AWX-24.6.1-red.svg)](https://github.com/ansible/awx)
 [![Docker](https://img.shields.io/badge/Docker-24%2B-blue.svg)](https://docs.docker.com/engine/install/)
-[![GitHub Stars](https://img.shields.io/github/stars/getautoflow/autoflow?style=flat)](https://github.com/getautoflow/autoflow/stargazers)
-[![GitHub Issues](https://img.shields.io/github/issues/getautoflow/autoflow)](https://github.com/getautoflow/autoflow/issues)
+[![GitHub Stars](https://img.shields.io/github/stars/getautoflow/autoflow-community?style=flat)](https://github.com/getautoflow/autoflow-community/stargazers)
+[![GitHub Issues](https://img.shields.io/github/issues/getautoflow/autoflow-community)](https://github.com/getautoflow/autoflow-community/issues)
 
-[Site officiel](https://getautoflow.dev) · [Documentation](https://getautoflow.dev/docs) · [Version Enterprise](https://getautoflow.dev/pricing) · [Signaler un bug](https://github.com/getautoflow/autoflow/issues)
+[Site officiel](https://getautoflow.dev) · [Documentation](https://getautoflow.dev/docs) · [Version Enterprise](https://getautoflow.dev/pricing) · [Signaler un bug](https://github.com/getautoflow/autoflow-community/issues)
 
 </div>
 
@@ -20,12 +20,19 @@
 
 ## À propos
 
-Autoflow Community est une distribution **prête à l'emploi** d'[AWX](https://github.com/ansible/awx) — l'interface web open-source pour Ansible — packagée avec l'image officielle AWX (`quay.io/ansible/awx`), un `docker-compose.yml` opérationnel et un fichier `.env` documenté.
+Autoflow Community est une distribution **prête à l'emploi** d'[AWX](https://github.com/ansible/awx) — l'interface web open-source pour Ansible — packagée avec :
+
+- Une **image AWX patchée** (CVE fixes, Docker CLI intégré) construite localement depuis le `Dockerfile` inclus
+- Un **`docker-compose.yml`** opérationnel (AWX + PostgreSQL + Redis + Receptor)
+- Une **interface de connexion personnalisée** avec logo et thème Autoflow
+- Un fichier **`.env` documenté** pour configurer tous les paramètres
 
 L'objectif est simple : vous concentrer sur l'automatisation de votre infrastructure, pas sur l'installation d'AWX.
 
+> **Aucun fichier binaire à télécharger.** Les images Docker sont construites directement sur votre machine depuis les Dockerfiles du dépôt, en s'appuyant sur les images de base officielles publiques.
+
 ```
-$ docker compose up -d
+$ docker compose build && docker compose up -d
 ...
 ✓ postgres   healthy
 ✓ redis      healthy
@@ -39,14 +46,28 @@ $ docker compose up -d
 
 | | **Autoflow Community** | AWX (installation officielle) | Ansible Automation Platform |
 |---|:---:|:---:|:---:|
-| Temps de déploiement | **~5 min** | 2–4 heures | Plusieurs jours |
+| Temps de déploiement | **~15 min** | 2–4 heures | Plusieurs jours |
 | Docker Compose ready | ✅ | ❌ (Kubernetes requis) | ❌ |
-| Image officielle AWX | ✅ | ✅ | ✅ |
+| Image patchée (CVE fixes) | ✅ | ❌ (à construire) | ✅ |
+| Interface de connexion custom | ✅ | ❌ | ✅ |
 | Execution Environments inclus | ✅ | ❌ | ✅ |
 | Sans comptage de nœuds | ✅ | ✅ | ❌ (licence par nœud) |
 | Gratuit pour toujours | ✅ | ✅ | ❌ (~14 000 €/an) |
 | PKI, Gitea, Grafana intégrés | ❌ ([Enterprise](https://getautoflow.dev/pricing)) | ❌ | Partiel |
 | Support commercial | ❌ ([Enterprise](https://getautoflow.dev/pricing)) | ❌ | ✅ |
+
+---
+
+## Ce qui est construit localement
+
+Le projet contient deux `Dockerfile` qui sont buildés sur votre machine :
+
+| Image | Dockerfile | Base | Rôle |
+|---|---|---|---|
+| `autoflow/awx-patched:24.6.1` | `config/awx/Dockerfile` | `ghcr.io/ansible/awx:24.6.1` | AWX Web + Task + Migration |
+| `autoflow/receptor-community:local` | `config/receptor/Dockerfile` | `quay.io/ansible/receptor:v1.6.4` | Moteur d'exécution des jobs |
+
+Les images de base sont publiques — **aucun compte ou accès privé requis**.
 
 ---
 
@@ -120,31 +141,13 @@ sudo dnf install -y git curl openssl
 
 **Python n'est pas nécessaire pour faire tourner la stack AWX.** Tout s'exécute dans des conteneurs Docker.
 
-Python est utile uniquement si vous souhaitez :
-- Construire des **Execution Environments** personnalisés avec `ansible-builder`
-- Utiliser le client CLI `awxkit` pour scripter l'API AWX
-
-```bash
-# Vérifier
-python3 --version      # ≥ 3.9 recommandé
-
-# Ubuntu / Debian
-sudo apt-get install -y python3 python3-venv python3-pip
-
-# RHEL / Rocky / AlmaLinux
-sudo dnf install -y python3 python3-pip
-```
-
-Créez un environnement virtuel dédié pour isoler les outils Ansible :
+Python est utile uniquement si vous souhaitez construire des **Execution Environments** personnalisés avec `ansible-builder` :
 
 ```bash
 python3 -m venv ~/ansible-tools
 source ~/ansible-tools/bin/activate
 pip install ansible-builder awxkit
 ```
-
-> **Pourquoi un venv ?** Pour éviter les conflits entre versions de packages Python sur votre système.
-> Réactivez l'environnement à chaque session : `source ~/ansible-tools/bin/activate`
 
 ---
 
@@ -153,8 +156,8 @@ pip install ansible-builder awxkit
 ### 1. Cloner le dépôt
 
 ```bash
-git clone https://github.com/getautoflow/autoflow.git
-cd autoflow
+git clone https://github.com/getautoflow/autoflow-community.git
+cd autoflow-community
 ```
 
 ### 2. Configurer l'environnement
@@ -191,24 +194,30 @@ getent group docker | cut -d: -f3
 # exemple : 998  →  ajoutez DOCKER_GID=998 dans .env
 ```
 
-### 4. Construire et démarrer
+### 4. Construire les images
 
 ```bash
-# Construire l'image Receptor (une seule fois, ou après modification du Dockerfile)
-docker compose build receptor
+docker compose build
+```
 
-# Démarrer la stack
+> Le premier build télécharge les images de base officielles et applique les patches CVE.
+> **Durée estimée : 10–15 minutes** selon votre connexion et votre machine.
+> Les builds suivants sont instantanés (couches mises en cache).
+
+### 5. Démarrer la stack
+
+```bash
 docker compose up -d
 ```
 
-La première fois, Docker initialise la base de données AWX (~3–5 minutes). Suivez la progression :
+La première fois, AWX initialise la base de données (~3–5 minutes). Suivez la progression :
 
 ```bash
 docker compose logs -f awx_migrate   # étape 1 : migrations + création admin
 docker compose logs -f awx_web       # étape 2 : démarrage interface
 ```
 
-### 5. Accéder à AWX
+### 6. Accéder à AWX
 
 Une fois `awx_web` en état `healthy` :
 
@@ -238,6 +247,7 @@ docker compose ps
 | `AWX_ADMIN_PASSWORD` | Mot de passe du compte administrateur | **obligatoire** |
 | `AWX_ADMIN_EMAIL` | Email du compte administrateur | `admin@example.com` |
 | `AWX_SECRET_KEY` | Clé secrète Django — générer avec `openssl rand -hex 32` | **obligatoire** |
+| `AWX_ALLOWED_HOSTS` | Hôtes autorisés (virgule-séparés) | `*` |
 | `AWX_HTTP_PORT` | Port HTTP exposé sur l'hôte | `8080` |
 | `DOCKER_GID` | GID du groupe `docker` sur l'hôte | `998` |
 
@@ -327,7 +337,6 @@ server {
     ssl_certificate     /etc/letsencrypt/live/awx.votre-domaine.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/awx.votre-domaine.com/privkey.pem;
 
-    # En-têtes de sécurité
     add_header Strict-Transport-Security "max-age=31536000" always;
     add_header X-Frame-Options SAMEORIGIN;
     add_header X-Content-Type-Options nosniff;
@@ -381,13 +390,11 @@ awx.votre-domaine.com {
 sudo systemctl reload caddy
 ```
 
-> **Note :** Après avoir configuré le reverse proxy, changez `AWX_HTTP_PORT` pour qu'AWX ne soit plus accessible directement depuis l'extérieur (par exemple `AWX_HTTP_PORT=127.0.0.1:8080` pour le lier à localhost uniquement).
+> **Note :** Après avoir configuré le reverse proxy, liez AWX uniquement à localhost : `AWX_HTTP_PORT=127.0.0.1:8080` dans votre `.env`.
 
 ---
 
 ## Pare-feu
-
-Autorisez uniquement les ports nécessaires :
 
 ```bash
 # UFW (Ubuntu/Debian)
@@ -412,13 +419,14 @@ sudo firewall-cmd --reload
 - [ ] `.env` protégé en lecture seule : `chmod 600 .env`
 - [ ] Mots de passe forts (≥ 20 caractères) pour `POSTGRES_PASSWORD`, `REDIS_PASSWORD`, `AWX_ADMIN_PASSWORD`
 - [ ] `AWX_SECRET_KEY` générée avec `openssl rand -hex 32`, unique par environnement
+- [ ] `AWX_ALLOWED_HOSTS` restreint au nom de domaine réel (pas `*`) en production
 - [ ] AWX derrière un reverse proxy TLS (nginx ou Caddy)
 - [ ] Port 8080 fermé depuis l'extérieur (firewall)
 - [ ] SSH avec clé uniquement (`PasswordAuthentication no`)
 - [ ] Mises à jour système régulières (`apt upgrade` / `dnf update`)
 - [ ] Sauvegardes testées et stockées hors du serveur
 
-> **Docker socket :** Receptor monte `/var/run/docker.sock` pour lancer les conteneurs EE.
+> **Docker socket :** Receptor et AWX Task montent `/var/run/docker.sock` pour lancer les conteneurs EE.
 > Tout processus avec accès à ce socket a les droits root effectif sur l'hôte.
 > Assurez-vous que seuls les conteneurs de cette stack y accèdent.
 
@@ -434,26 +442,6 @@ Un **Execution Environment (EE)** est l'image Docker dans laquelle AWX exécute 
 - Les **collections Ansible** dont vos playbooks ont besoin (`community.general`, `cisco.ios`, `amazon.aws`…)
 - Les **dépendances Python** associées (`boto3`, `netmiko`, `pyOpenSSL`…)
 
-L'EE est isolé du reste de la stack. Chaque job AWX tourne dans son propre conteneur éphémère — pas de conflit de dépendances, pas d'effet de bord entre projets.
-
-```
-AWX Task
-  └── lance un job
-        └── docker run <image-EE>
-              └── ansible-runner worker
-                    └── ansible-playbook site.yml
-```
-
-### EE par défaut
-
-L'image Autoflow inclut un EE de base pré-enregistré dans AWX :
-
-| Nom | Collections incluses | Cas d'usage |
-|---|---|---|
-| `EE Default (Autoflow)` | `ansible.builtin`, `community.general`, `ansible.posix` | Tâches Linux générales |
-
-Vous le trouverez dans AWX sous **Administration → Execution Environments**.
-
 ### Utiliser un EE externe
 
 Pour ajouter un EE depuis Docker Hub, GHCR ou votre registry privé :
@@ -464,43 +452,30 @@ Pour ajouter un EE depuis Docker Hub, GHCR ou votre registry privé :
 
 ### Construire votre propre EE
 
-Requis : Python 3.9+, venv, Docker — voir la section [Prérequis](#prérequis).
-
 ```bash
-# Activer l'environnement Python
 source ~/ansible-tools/bin/activate
 
-# Créer le fichier de définition
 cat > execution-environment.yml <<'EOF'
 version: 3
-
-build_arg_defaults:
-  ANSIBLE_GALAXY_CLI_COLLECTION_OPTS: '--pre'
 
 dependencies:
   galaxy:
     collections:
       - name: community.general
-        version: ">=9.0"
       - name: ansible.posix
-      - name: cisco.ios          # Automatisation réseau Cisco
-      - name: community.crypto   # Gestion PKI / TLS
+      - name: cisco.ios
 
   python:
-    - boto3                      # Modules AWS
-    - netmiko                    # Équipements réseau
+    - boto3
+    - netmiko
 EOF
 
-# Construire l'image
 ansible-builder build \
   --tag mon-registry/mon-ee:1.0.0 \
   --file execution-environment.yml
 
-# Pousser sur votre registry
 docker push mon-registry/mon-ee:1.0.0
 ```
-
-Puis enregistrez l'image dans AWX comme décrit ci-dessus.
 
 ---
 
@@ -527,6 +502,9 @@ docker compose exec awx_web bash
 # Lancer une commande awx-manage
 docker compose exec awx_web awx-manage shell
 
+# Reconstruire les images (après mise à jour du Dockerfile)
+docker compose build --no-cache
+
 # Arrêter la stack (données conservées dans les volumes)
 docker compose stop
 
@@ -545,7 +523,6 @@ docker compose down -v
 
 ```bash
 #!/usr/bin/env bash
-# Sauvegarde complète — à exécuter avant chaque mise à jour
 BACKUP_DIR="/opt/backups/awx"
 DATE=$(date +%Y%m%d-%H%M%S)
 mkdir -p "$BACKUP_DIR"
@@ -555,7 +532,7 @@ docker compose exec -T postgres pg_dump \
   -U "${POSTGRES_USER:-awx}" "${POSTGRES_DB:-awx}" \
   | gzip > "$BACKUP_DIR/postgres-$DATE.sql.gz"
 
-# 2. Projets AWX (playbooks clonés depuis les SCM)
+# 2. Projets AWX
 docker run --rm \
   -v autoflow_community_projects:/data \
   -v "$BACKUP_DIR":/backup \
@@ -570,15 +547,12 @@ ls -lh "$BACKUP_DIR"
 ### Restaurer la base de données
 
 ```bash
-# Arrêter AWX (mais pas Postgres)
 docker compose stop awx_web awx_task receptor
 
-# Restaurer
 gunzip -c /opt/backups/awx/postgres-YYYYMMDD.sql.gz \
   | docker compose exec -T postgres psql \
     -U "${POSTGRES_USER:-awx}" "${POSTGRES_DB:-awx}"
 
-# Redémarrer
 docker compose up -d
 ```
 
@@ -588,9 +562,7 @@ docker compose up -d
 
 ### 1. Sauvegarder avant tout
 
-```bash
-# Voir section Sauvegarde ci-dessus
-```
+Voir section [Sauvegarde](#sauvegarde-et-restauration) ci-dessus.
 
 ### 2. Vérifier les notes de version
 
@@ -599,8 +571,8 @@ Consultez le [CHANGELOG](CHANGELOG.md) avant toute mise à jour majeure.
 ### 3. Appliquer la mise à jour
 
 ```bash
-# Mettre à jour AWX_VERSION dans .env, puis :
-docker compose pull
+# Mettre à jour AWX_VERSION dans .env, puis reconstruire l'image patchée :
+docker compose build --no-cache awx_web
 docker compose up -d
 ```
 
@@ -655,8 +627,8 @@ Internet
 
 ## Support & Communauté
 
-- **Bug ou question ?** → [GitHub Issues](https://github.com/getautoflow/autoflow/issues)
-- **Discussions** → [GitHub Discussions](https://github.com/getautoflow/autoflow/discussions)
+- **Bug ou question ?** → [GitHub Issues](https://github.com/getautoflow/autoflow-community/issues)
+- **Discussions** → [GitHub Discussions](https://github.com/getautoflow/autoflow-community/discussions)
 - **Site officiel** → [getautoflow.dev](https://getautoflow.dev)
 - **Documentation AWX** → [ansible.readthedocs.io](https://ansible.readthedocs.io/projects/awx/)
 - **Email** → [support@getautoflow.dev](mailto:support@getautoflow.dev)
@@ -682,12 +654,8 @@ La **[version Enterprise d'Autoflow](https://getautoflow.dev/pricing)** ajoute :
 Les contributions sont les bienvenues ! Consultez [CONTRIBUTING.md](CONTRIBUTING.md) pour les détails.
 
 ```bash
-# Fork + clone
-git clone https://github.com/getautoflow/autoflow.git
-
-# Créer une branche
+git clone https://github.com/getautoflow/autoflow-community.git
 git checkout -b feat/ma-contribution
-
 # Soumettre une Pull Request
 ```
 
