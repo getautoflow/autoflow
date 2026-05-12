@@ -14,12 +14,7 @@ awx-manage migrate --noinput
 log "=== Étape 2 : Types de credentials built-in ==="
 awx-manage setup_managed_credential_types
 
-log "=== Étape 3 : Données de démo (organisation, inventaire, projet) ==="
-# create_preload_data crée l'organisation par défaut et les données initiales.
-# Le UserProfile de l'admin en dépend — doit tourner AVANT la création du compte.
-awx-manage create_preload_data
-
-log "=== Étape 4 : Création du compte administrateur ==="
+log "=== Étape 3 : Création du compte administrateur ==="
 awx-manage shell -c "
 import os, sys
 from django.contrib.auth.models import User
@@ -51,5 +46,9 @@ except Exception as e:
 action = 'créé' if created else 'mis à jour'
 print(f'Compte administrateur \"{username}\" {action}.')
 "
+
+log "=== Étape 4 : Données de démo (organisation, inventaire, projet) ==="
+# create_preload_data nécessite un superuser existant — doit tourner APRÈS l'étape 3.
+awx-manage create_preload_data
 
 log "=== Initialisation terminée — AWX prêt ==="

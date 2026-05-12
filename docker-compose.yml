@@ -6,10 +6,11 @@
 #
 # Prérequis :
 #   - Docker Engine 24+ et Docker Compose v2
-#   - Avoir rempli le fichier .env (cp .env .env et éditer les valeurs)
+#   - Avoir rempli le fichier .env (cp .env.example .env et éditer les valeurs)
 #   - Le groupe docker doit exister : getent group docker
 #
 # Démarrage :
+#   docker compose build
 #   docker compose up -d
 #   docker compose logs -f awx_web   # suivre l'init (≈ 3-5 min au premier boot)
 # ──────────────────────────────────────────────────────────────────────────────
@@ -26,6 +27,8 @@ volumes:
     name: autoflow_community_redis
   awx_projects:
     name: autoflow_community_projects
+  awx_receptor:
+    name: autoflow_community_receptor
   receptor_run:
     name: autoflow_community_receptor_run
 
@@ -43,6 +46,13 @@ x-awx-env: &awx-env
   AWX_ADMIN_PASSWORD: ${AWX_ADMIN_PASSWORD}
   AWX_ADMIN_EMAIL:    ${AWX_ADMIN_EMAIL:-admin@example.com}
   AWX_SECRET_KEY:     ${AWX_SECRET_KEY}
+
+# Sécurité Linux — empêche l'escalade de privilèges via SUID/SGID.
+# NE PAS appliquer sur awx_web, awx_task, awx_migrate, receptor :
+# Ansible become:true utilise sudo (SUID) — no-new-privileges casserait les playbooks.
+x-security-default: &security-default
+  security_opt:
+    - no-new-privileges:true
 
 x-log: &log-default
   logging:
@@ -72,8 +82,7 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
-    security_opt: [no-new-privileges:true]
-    <<: *log-default
+    <<: [*security-default, *log-default]
 
   # ── Redis ───────────────────────────────────────────────────────────────────
   redis:
@@ -95,10 +104,11 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
-    security_opt: [no-new-privileges:true]
-    <<: *log-default
+    <<: [*security-default, *log-default]
 
   # ── Receptor — moteur d'exécution des jobs Ansible ─────────────────────────
+  # Pas de no-new-privileges : ansible-runner lance des processus qui peuvent
+  # nécessiter une élévation de privilèges (become:true).
   receptor:
     build:
       context: ./config/receptor
@@ -125,10 +135,10 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
-    security_opt: [no-new-privileges:true]
     <<: *log-default
 
   # ── AWX Migrate — initialisation de la base (one-shot) ─────────────────────
+  # Pas de no-new-privileges : même image qu'awx_web/task.
   awx_migrate:
     build:
       context: ./config/awx
@@ -150,11 +160,13 @@ services:
     volumes:
       - ./config/awx/settings.py:/etc/tower/settings.py:ro
       - ./config/awx/init.sh:/etc/awx-init/init.sh:ro
+      - awx_receptor:/var/lib/awx/receptor
     networks:
       - awx
     <<: *log-default
 
   # ── AWX Web — interface utilisateur ────────────────────────────────────────
+  # Pas de no-new-privileges : voir commentaire receptor.
   awx_web:
     build:
       context: ./config/awx
@@ -184,6 +196,7 @@ services:
       - ./config/awx/custom/index.html:/var/lib/awx/venv/awx/lib/python3.11/site-packages/awx/ui/build/index.html:ro
       - ./config/awx/custom:/var/lib/awx/public/static/custom:ro
       - awx_projects:/var/lib/awx/projects
+      - awx_receptor:/var/lib/awx/receptor
       - receptor_run:/var/run/receptor
     networks:
       - awx
@@ -193,10 +206,10 @@ services:
       timeout: 10s
       retries: 10
       start_period: 60s
-    security_opt: [no-new-privileges:true]
     <<: *log-default
 
   # ── AWX Task — exécution des playbooks Ansible ─────────────────────────────
+  # Pas de no-new-privileges : voir commentaire receptor.
   awx_task:
     build:
       context: ./config/awx
@@ -221,6 +234,7 @@ services:
       - ./config/awx/settings.py:/etc/tower/settings.py:ro
       - ./config/awx/launch_awx_task.sh:/etc/awx-init/launch_awx_task.sh:ro
       - awx_projects:/var/lib/awx/projects
+      - awx_receptor:/var/lib/awx/receptor
       - receptor_run:/var/run/receptor
       - /var/run/docker.sock:/var/run/docker.sock
       - /tmp:/tmp
@@ -228,5 +242,4 @@ services:
       - "${DOCKER_GID:-998}"
     networks:
       - awx
-    security_opt: [no-new-privileges:true]
     <<: *log-default
