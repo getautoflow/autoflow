@@ -24,5 +24,13 @@ wait-for-migrations
 echo "[autoflow] Registering instance: hostname=${HOSTNAME}, type=hybrid"
 awx-manage provision_instance --hostname "${HOSTNAME}" --node_type hybrid
 
+# Associe l'instance aux groupes de dispatch (controlplane + default).
+# CRITIQUE : sans ces deux appels, l'instance existe en base mais n'appartient
+# à aucun Instance Group → les jobs soumis au groupe "default" n'ont aucun
+# worker pour les prendre en charge et restent en "pending" indéfiniment.
+echo "[autoflow] Registering instance groups..."
+awx-manage register_queue --queuename=controlplane --instance_percent=100
+awx-manage register_queue --queuename=default       --instance_percent=100
+
 echo "[autoflow] Starting AWX task supervisor..."
 exec supervisord -c /etc/supervisord_task.conf

@@ -3,11 +3,13 @@
 # AWX hardcodes "podman" and passes Podman-only flags that Docker rejects.
 #
 # Translations applied:
-#   --network slirp4netns:*  → --network bridge  (Podman rootless networking)
-#   --network=slirp4netns:*  → --network=bridge
-#   --authfile /path         → --config /tmpdir  (Docker uses a dir with config.json)
-#   --annotation key=val     → (dropped, Podman-only OCI annotation)
-#   --userns=*               → (dropped, Podman user-namespace flag)
+#   --network slirp4netns:*       → --network bridge   (Podman rootless networking)
+#   --network=slirp4netns:*       → --network=bridge
+#   --authfile /path              → --config /tmpdir    (Docker uses a dir with config.json)
+#   --annotation key=val          → (dropped, Podman-only OCI annotation)
+#   --userns=*                    → (dropped, Podman user-namespace flag)
+#   -v path:path:O                → -v path:path:rw     (':O' = Podman overlay, unknown to Docker)
+#   -v path:path:ro,O / :z,O etc  → strip the ',O' suffix
 
 subcmd_args=()   # flags/values after the subcommand
 global_args=()   # Docker global flags (before the subcommand)
@@ -57,6 +59,25 @@ while [ $i -lt $count ]; do
             ;;
         --annotation=*)
             # Inline form — drop
+            ;;
+        -v|--volume)
+            # Volume mount — strip Podman-only ':O' overlay mode that Docker rejects.
+            #   path:path:O       → path:path:rw
+            #   path:path:ro,O   → path:path:ro
+            #   path:path:z,O    → path:path:z
+            i=$((i + 1))
+            vol="${argv[$i]}"
+            # Strip standalone ':O' mode (exact match at end)
+            vol="${vol/%:O/:rw}"
+            # Strip ',O' suffix from combined modes (e.g. ro,O → ro)
+            vol="${vol/,O/}"
+            subcmd_args+=(-v "$vol")
+            ;;
+        -v=*|--volume=*)
+            vol="${arg#*=}"
+            vol="${vol/%:O/:rw}"
+            vol="${vol/,O/}"
+            subcmd_args+=(--volume="$vol")
             ;;
         *)
             # First non-flag arg is the subcommand; everything after goes to subcmd_args

@@ -88,7 +88,21 @@ DEFAULT_CONTAINER_RUN_OPTIONS = [
     '--network', 'bridge',
 ]
 
+# Répertoire de base pour les private_data_dir des jobs ansible-runner.
+# Doit être un chemin accessible à la fois par awx_task et par le conteneur
+# Receptor/EE. '/tmp' est bind-monté depuis l'hôte dans les deux conteneurs,
+# ce qui garantit que les chemins sont identiques côté awx_task et côté EE.
 AWX_ISOLATION_BASE_PATH = os.environ.get('AWX_ISOLATION_BASE_PATH', '/tmp')
+
+# AWX production.py définit par défaut :
+#   AWX_ISOLATION_SHOW_PATHS = [
+#       '/etc/pki/ca-trust:/etc/pki/ca-trust:O',
+#       '/usr/share/pki:/usr/share/pki:O',
+#   ]
+# Le mode ':O' est une option Podman (overlay mount). Docker ne le connaît pas
+# et échoue avec : "Error response from daemon: invalid mode: O"
+# En Community on n'a pas de PKI interne → liste vide, aucun chemin supplémentaire.
+AWX_ISOLATION_SHOW_PATHS = []
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 LOGGING = {

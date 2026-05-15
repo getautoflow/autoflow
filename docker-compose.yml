@@ -29,6 +29,11 @@ volumes:
     name: autoflow_community_projects
   receptor_run:
     name: autoflow_community_receptor_run
+  # Répertoire de données Receptor (work units, signing keys, artifact dirs).
+  # CRITIQUE : sans ce volume, Receptor n'a nulle part où persister l'état des
+  # tâches → les jobs restent en "pending" indéfiniment.
+  awx_receptor:
+    name: autoflow_community_receptor_data
 
 # ── Shared environment ────────────────────────────────────────────────────────
 x-awx-env: &awx-env
@@ -158,6 +163,8 @@ services:
     volumes:
       - ./config/awx/settings.py:/etc/tower/settings.py:ro
       - ./config/awx/init.sh:/etc/awx-init/init.sh:ro
+      - awx_projects:/var/lib/awx/projects
+      - awx_receptor:/var/lib/awx/receptor
     networks:
       - awx
     <<: *log-default
@@ -232,10 +239,17 @@ services:
       - ./config/receptor/receptor.conf:/etc/receptor/receptor.conf:ro
       - awx_projects:/var/lib/awx/projects
       - receptor_run:/var/run/receptor
+      - awx_receptor:/var/lib/awx/receptor
       - /var/run/docker.sock:/var/run/docker.sock
       - /tmp:/tmp
     group_add:
       - "${DOCKER_GID:-998}"
     networks:
       - awx
+    healthcheck:
+      test: ["CMD-SHELL", "awx-manage check || exit 1"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 60s
     <<: *log-default

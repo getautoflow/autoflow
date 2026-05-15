@@ -56,4 +56,28 @@ log "=== Étape 5 : Enregistrement des Execution Environments par défaut ==="
 # lève une RuntimeError sur la requête OPTIONS et renvoie 500 au navigateur.
 awx-manage register_default_execution_environments
 
+log "=== Étape 6 : Politique de pull EE → 'missing' ==="
+# Par défaut AWX enregistre les EE built-in avec pull='always', ce qui force
+# un docker pull ghcr.io/ansible/awx-ee:latest à chaque lancement de job.
+# Si le registry est lent ou inaccessible, le job reste en "pending" jusqu'au
+# timeout. On force 'missing' : l'image n'est tirée que si absente localement.
+awx-manage shell -c "
+from awx.main.models import ExecutionEnvironment
+n = ExecutionEnvironment.objects.filter(pull='always').update(pull='missing')
+print(f'[init] EE pull policy: {n} EE(s) mis à jour → pull=missing')
+"
+
+log "=== Étape 7 : Pré-téléchargement de l'image EE de base ==="
+# Tire l'image maintenant (pendant l'init, pas pendant le premier job) pour
+# éviter tout délai ou échec réseau au moment du dispatch.
+# On utilise 'docker pull' si Docker est disponible, sinon on ignore.
+AWX_EE_IMAGE="ghcr.io/ansible/awx-ee:latest"
+if command -v docker &>/dev/null; then
+    log "docker pull ${AWX_EE_IMAGE} ..."
+    docker pull "${AWX_EE_IMAGE}" && log "Image EE pré-téléchargée ✔" \
+        || log "WARN: docker pull échoué — le premier job tentera lui-même (réseau ?)"
+else
+    log "WARN: docker non disponible dans ce conteneur — pull ignoré."
+fi
+
 log "=== Initialisation terminée — AWX prêt ==="
