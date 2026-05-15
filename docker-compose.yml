@@ -27,8 +27,6 @@ volumes:
     name: autoflow_community_redis
   awx_projects:
     name: autoflow_community_projects
-  awx_receptor:
-    name: autoflow_community_receptor
   receptor_run:
     name: autoflow_community_receptor_run
 
@@ -160,7 +158,6 @@ services:
     volumes:
       - ./config/awx/settings.py:/etc/tower/settings.py:ro
       - ./config/awx/init.sh:/etc/awx-init/init.sh:ro
-      - awx_receptor:/var/lib/awx/receptor
     networks:
       - awx
     <<: *log-default
@@ -196,7 +193,6 @@ services:
       - ./config/awx/custom/index.html:/var/lib/awx/venv/awx/lib/python3.11/site-packages/awx/ui/build/index.html:ro
       - ./config/awx/custom:/var/lib/awx/public/static/custom:ro
       - awx_projects:/var/lib/awx/projects
-      - awx_receptor:/var/lib/awx/receptor
       - receptor_run:/var/run/receptor
     networks:
       - awx
@@ -233,8 +229,8 @@ services:
     volumes:
       - ./config/awx/settings.py:/etc/tower/settings.py:ro
       - ./config/awx/launch_awx_task.sh:/etc/awx-init/launch_awx_task.sh:ro
+      - ./config/receptor/receptor.conf:/etc/receptor/receptor.conf:ro
       - awx_projects:/var/lib/awx/projects
-      - awx_receptor:/var/lib/awx/receptor
       - receptor_run:/var/run/receptor
       - /var/run/docker.sock:/var/run/docker.sock
       - /tmp:/tmp

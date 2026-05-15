@@ -51,4 +51,9 @@ log "=== Étape 4 : Données de démo (organisation, inventaire, projet) ==="
 # create_preload_data nécessite un superuser existant — doit tourner APRÈS l'étape 3.
 awx-manage create_preload_data
 
+log "=== Étape 5 : Enregistrement des Execution Environments par défaut ==="
+# Obligatoire : sans EE enregistré, le endpoint /api/v2/instance_groups/
+# lève une RuntimeError sur la requête OPTIONS et renvoie 500 au navigateur.
+awx-manage register_default_execution_environments
+
 log "=== Initialisation terminée — AWX prêt ==="
