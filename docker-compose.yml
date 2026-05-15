@@ -25,8 +25,12 @@ volumes:
     name: autoflow_community_postgres
   redis_data:
     name: autoflow_community_redis
-  awx_projects:
-    name: autoflow_community_projects
+  # awx_projects : PAS de named volume — bind mount direct sur /var/lib/awx/projects
+  # CRITIQUE : AWX monte le project_path dans les conteneurs EE via docker socket.
+  # Le host Docker daemon résout les chemins depuis le système de fichiers HÔTE.
+  # Avec un named volume, Docker crée un répertoire vide sur l'hôte au lieu d'utiliser
+  # les données du volume → git clone écrit hors du volume → répertoire projet toujours vide.
+  # Solution : bind mount /var/lib/awx/projects (hôte) = /var/lib/awx/projects (conteneur).
   receptor_run:
     name: autoflow_community_receptor_run
   # Répertoire de données Receptor (work units, signing keys, artifact dirs).
@@ -125,7 +129,7 @@ services:
     volumes:
       - ./config/receptor/receptor.conf:/etc/receptor/receptor.conf:ro
       - receptor_run:/var/run/receptor
-      - awx_projects:/var/lib/awx/projects
+      - /var/lib/awx/projects:/var/lib/awx/projects
       - /var/run/docker.sock:/var/run/docker.sock
       - /tmp:/tmp
     group_add:
@@ -163,7 +167,7 @@ services:
     volumes:
       - ./config/awx/settings.py:/etc/tower/settings.py:ro
       - ./config/awx/init.sh:/etc/awx-init/init.sh:ro
-      - awx_projects:/var/lib/awx/projects
+      - /var/lib/awx/projects:/var/lib/awx/projects
       - awx_receptor:/var/lib/awx/receptor
     networks:
       - awx
@@ -199,7 +203,7 @@ services:
       - ./config/awx/nginx.conf:/etc/nginx/default.d/awx.conf:ro
       - ./config/awx/custom/index.html:/var/lib/awx/venv/awx/lib/python3.11/site-packages/awx/ui/build/index.html:ro
       - ./config/awx/custom:/var/lib/awx/public/static/custom:ro
-      - awx_projects:/var/lib/awx/projects
+      - /var/lib/awx/projects:/var/lib/awx/projects
       - receptor_run:/var/run/receptor
     networks:
       - awx
@@ -237,7 +241,7 @@ services:
       - ./config/awx/settings.py:/etc/tower/settings.py:ro
       - ./config/awx/launch_awx_task.sh:/etc/awx-init/launch_awx_task.sh:ro
       - ./config/receptor/receptor.conf:/etc/receptor/receptor.conf:ro
-      - awx_projects:/var/lib/awx/projects
+      - /var/lib/awx/projects:/var/lib/awx/projects
       - receptor_run:/var/run/receptor
       - awx_receptor:/var/lib/awx/receptor
       - /var/run/docker.sock:/var/run/docker.sock
